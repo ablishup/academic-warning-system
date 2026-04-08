@@ -1,5 +1,49 @@
 # courses/models.py
 from django.db import models
+from django.contrib.auth.models import User
+
+
+class CourseResource(models.Model):
+    """课程教学资料模型 - 对应数据库 course_resources 表"""
+    RESOURCE_TYPE_CHOICES = [
+        ('video', '视频'),
+        ('document', '文档'),
+        ('ppt', '课件'),
+        ('exercise', '习题'),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    course = models.ForeignKey('Course', on_delete=models.CASCADE, db_column='course_id',
+                               related_name='resources')
+    knowledge_point = models.ForeignKey('KnowledgePoint', on_delete=models.SET_NULL,
+                                        db_column='knowledge_point_id',
+                                        null=True, blank=True,
+                                        related_name='resources')
+    name = models.CharField(max_length=200, db_column='name', verbose_name='资料名称')
+    file = models.FileField(upload_to='resources/%Y/%m/', db_column='file_path',
+                            verbose_name='文件')
+    resource_type = models.CharField(max_length=20, choices=RESOURCE_TYPE_CHOICES,
+                                     db_column='resource_type', verbose_name='资料类型')
+    description = models.TextField(blank=True, null=True, db_column='description',
+                                   verbose_name='描述')
+    file_size = models.IntegerField(default=0, db_column='file_size',
+                                    verbose_name='文件大小(字节)')
+    download_count = models.IntegerField(default=0, db_column='download_count',
+                                         verbose_name='下载次数')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, db_column='created_by',
+                                   null=True, blank=True, verbose_name='上传者')
+    created_at = models.DateTimeField(auto_now_add=True, db_column='created_at')
+    updated_at = models.DateTimeField(auto_now=True, db_column='updated_at')
+
+    class Meta:
+        db_table = 'course_resources'
+        managed = False
+        verbose_name = '课程资源'
+        verbose_name_plural = '课程资源'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
 
 
 class Course(models.Model):

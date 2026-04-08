@@ -5,6 +5,8 @@ urlpatterns = [
     # 学习活动
     path('activities/', views.LearningActivityListView.as_view(), name='learning-activities'),
     path('activities/summary/', views.LearningActivitySummaryView.as_view(), name='learning-activity-summary'),
+    path('record/', views.LearningActivityRecordView.as_view(), name='learning-activity-record'),
+    path('record/batch/', views.LearningActivityBatchRecordView.as_view(), name='learning-activity-batch-record'),
 
     # 作业
     path('homework/assignments/', views.HomeworkAssignmentListView.as_view(), name='homework-assignments'),

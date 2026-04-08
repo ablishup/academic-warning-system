@@ -1,11 +1,165 @@
-# courses/views.py
-from rest_framework import status
+import os
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
+from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Count
-from .models import Course, CourseEnrollment, KnowledgePoint
-from .serializers import CourseSerializer, KnowledgePointSerializer, CourseListSerializer
+from .models import Course, CourseEnrollment, KnowledgePoint, CourseResource
+from .serializers import (
+    CourseSerializer, KnowledgePointSerializer, CourseListSerializer,
+    CourseResourceSerializer, CourseResourceCreateSerializer
+)
+
+
+class CourseResourceListCreateView(generics.ListCreateAPIView):
+    """课程资源列表和创建视图"""
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = CourseResource.objects.all()
+
+        # 筛选参数
+        course_id = self.request.query_params.get('course_id')
+        resource_type = self.request.query_params.get('resource_type')
+        knowledge_point_id = self.request.query_params.get('knowledge_point_id')
+
+        if course_id:
+            queryset = queryset.filter(course_id=course_id)
+        if resource_type:
+            queryset = queryset.filter(resource_type=resource_type)
+        if knowledge_point_id:
+            queryset = queryset.filter(knowledge_point_id=knowledge_point_id)
+
+        return queryset.select_related('course', 'knowledge_point', 'created_by')
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return CourseResourceCreateSerializer
+        return CourseResourceSerializer
+
+    def perform_create(self, serializer):
+        """创建时设置上传者"""
+        serializer.save(created_by=self.request.user)
+
+    def list(self, request, *args, **kwargs):
+        """列表响应包装"""
+        response = super().list(request, *args, **kwargs)
+        return Response({
+            'code': 200,
+            'message': '获取成功',
+            'data': response.data
+        })
+
+    def create(self, request, *args, **kwargs):
+        """创建响应包装"""
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({
+                'code': 400,
+                'message': '参数错误',
+                'errors': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+
+        # 使用详细序列化器返回完整数据
+        detail_serializer = CourseResourceSerializer(
+            serializer.instance, context={'request': request}
+        )
+
+        return Response({
+            'code': 200,
+            'message': '上传成功',
+            'data': detail_serializer.data
+        }, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class CourseResourceDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """课程资源详情、更新、删除视图"""
+    permission_classes = [IsAuthenticated]
+    queryset = CourseResource.objects.all()
+    serializer_class = CourseResourceSerializer
+    lookup_field = 'pk'
+
+    def retrieve(self, request, *args, **kwargs):
+        """详情响应包装"""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({
+            'code': 200,
+            'message': '获取成功',
+            'data': serializer.data
+        })
+
+    def update(self, request, *args, **kwargs):
+        """更新响应包装"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = CourseResourceCreateSerializer(
+            instance, data=request.data, partial=partial
+        )
+        if not serializer.is_valid():
+            return Response({
+                'code': 400,
+                'message': '参数错误',
+                'errors': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        self.perform_update(serializer)
+
+        # 使用详细序列化器返回完整数据
+        detail_serializer = CourseResourceSerializer(
+            serializer.instance, context={'request': request}
+        )
+
+        return Response({
+            'code': 200,
+            'message': '更新成功',
+            'data': detail_serializer.data
+        })
+
+    def destroy(self, request, *args, **kwargs):
+        """删除响应包装"""
+        instance = self.get_object()
+        # 删除关联的文件
+        if instance.file:
+            file_path = instance.file.path
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+        self.perform_destroy(instance)
+        return Response({
+            'code': 200,
+            'message': '删除成功'
+        })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def course_resource_download_view(request, pk):
+    """下载课程资源"""
+    resource = get_object_or_404(CourseResource, pk=pk)
+
+    if not resource.file:
+        return Response({
+            'code': 404,
+            'message': '文件不存在'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # 增加下载计数
+    resource.download_count += 1
+    resource.save(update_fields=['download_count'])
+
+    file_path = resource.file.path
+    file_name = os.path.basename(file_path)
+
+    response = FileResponse(open(file_path, 'rb'))
+    response['Content-Type'] = 'application/octet-stream'
+    response['Content-Disposition'] = f'attachment; filename="{file_name}"'
+    return response
 
 
 @api_view(['GET'])

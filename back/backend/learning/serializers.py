@@ -7,6 +7,24 @@ from classes.serializers import StudentSerializer
 from courses.serializers import CourseSerializer, KnowledgePointSerializer
 
 
+class LearningActivityCreateSerializer(serializers.Serializer):
+    """学习活动创建序列化器"""
+    student_id = serializers.IntegerField(required=True, help_text='学生ID')
+    course_id = serializers.IntegerField(required=True, help_text='课程ID')
+    activity_type = serializers.ChoiceField(
+        choices=LearningActivity.ACTIVITY_TYPE_CHOICES,
+        required=True,
+        help_text='活动类型'
+    )
+    activity_name = serializers.CharField(required=True, max_length=200, help_text='活动名称')
+    chapter = serializers.IntegerField(required=False, allow_null=True, help_text='知识点ID')
+    start_time = serializers.DateTimeField(required=False, help_text='开始时间')
+    duration = serializers.IntegerField(required=False, default=0, help_text='持续时长(秒)')
+    progress = serializers.DecimalField(required=False, max_digits=5, decimal_places=2, default=0, help_text='进度百分比')
+    score = serializers.DecimalField(required=False, max_digits=5, decimal_places=2, allow_null=True, help_text='得分')
+    raw_data = serializers.JSONField(required=False, default=dict, help_text='原始数据(观看片段等)')
+
+
 class LearningActivitySerializer(serializers.ModelSerializer):
     """学习活动序列化器"""
     student = StudentSerializer(read_only=True)
