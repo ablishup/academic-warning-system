@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -L -o john.zip \"https://github.com/openwall/john-packages/releases/download/john-1.9.0-jumbo-1-win64/win64_1.9.0-jumbo-1.7z\")",
+      "Bash(curl -L -o john.zip \"https://www.openwall.com/john/k/john-1.9.0-jumbo-1-win64.zip\")",
+      "Bash(unzip -q john.zip)",
+      "Bash(./john-1.9.0-jumbo-1-win64/run/john.exe zip_hash.txt --wordlist=./john-1.9.0-jumbo-1-win64/run/password.lst)",
+      "Bash(./john-1.9.0-jumbo-1-win64/run/john.exe:*)",
+      "Bash(curl -L -o common_passwords.txt \"https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-100000.txt\")"
+    ]
+  }
+}

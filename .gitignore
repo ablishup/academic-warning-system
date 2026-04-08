@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# Vue/Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.lighthouseci/
+dist/
+*.local
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+venv/
+ENV/
+env/
+
+# Data files (large files)
+*.xls
+*.xlsx
+*.csv
+data/usedata/
+data/cleaned/*.csv
+data/基于在线教学平台的数据挖掘与学习行为分析【超星集团】数据集/
+
+# Keep schema and scripts
+!data/schema/
+!data/scripts/
+!data/*.md
+
+# Misc
+*.pid
+*.seed
+*.pid.lock
