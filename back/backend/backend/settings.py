@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "users",
     "courses",
     "classes",
+    "learning",
     "scores",
     "attendances",
     "resources",
