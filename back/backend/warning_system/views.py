@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 
 from classes.models import Student
 from courses.models import Course
+from algorithm.warning_predictor import WarningPredictor
+from algorithm.features import FeatureEngineering
 
 from .models import WarningRecord, StudentCourseScore
 from .serializers import (
@@ -62,7 +64,7 @@ class WarningRecordDetailView(generics.RetrieveAPIView):
 
 
 class WarningCalculateView(APIView):
-    """计算预警视图"""
+    """计算预警视图 - 使用随机森林算法"""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -84,16 +86,46 @@ class WarningCalculateView(APIView):
         if course_id:
             scores_query = scores_query.filter(course_id=course_id)
 
+        # 初始化预测器
+        predictor = WarningPredictor()
+        # 尝试加载已有模型，如果没有则使用传统方法
+        use_ml = predictor.load_model()
+        if not use_ml:
+            # 尝试训练模型（使用默认数据）
+            try:
+                predictor.train()
+                use_ml = True
+            except Exception as e:
+                # 训练失败则使用传统加权方法
+                use_ml = False
+
         # 计算预警
         created_count = 0
         updated_count = 0
+        calculation_results = []
 
         for score in scores_query.select_related('student', 'course'):
-            # 计算综合得分（加权平均）
-            composite_score = self._calculate_composite_score(score)
+            # 构建特征字典
+            features_dict = {
+                'attendance_rate': float(score.attendance_rate or 0),
+                'video_progress': float(score.video_progress or 0),
+                'homework_avg_score': float(score.homework_avg or 0),
+                'exam_avg_score': float(score.exam_avg or 0),
+            }
 
-            # 确定风险等级
-            risk_level = self._determine_risk_level(composite_score)
+            # 使用随机森林或加权方法预测
+            if use_ml:
+                prediction = predictor.predict(
+                    student_id=score.student_id,
+                    course_id=score.course_id,
+                    features_dict=features_dict
+                )
+                composite_score = prediction['predicted_score']
+                risk_level = prediction['risk_level']
+            else:
+                # 使用传统加权方法
+                composite_score = FeatureEngineering.calculate_composite_score(features_dict)
+                risk_level = FeatureEngineering.determine_risk_level(composite_score)
 
             # 检查是否已存在预警记录
             existing_warning = WarningRecord.objects.filter(
@@ -113,8 +145,10 @@ class WarningCalculateView(APIView):
                 existing_warning.calculation_time = timezone.now()
                 existing_warning.save()
                 updated_count += 1
+                result = 'updated'
             else:
                 # 创建新预警（只对非normal等级）
+                result = 'no_change'
                 if risk_level != 'normal':
                     WarningRecord.objects.create(
                         student=score.student,
@@ -127,6 +161,17 @@ class WarningCalculateView(APIView):
                         exam_score=score.exam_avg,
                     )
                     created_count += 1
+                    result = 'created'
+
+            calculation_results.append({
+                'student_id': score.student_id,
+                'student_name': score.student.name,
+                'course_id': score.course_id,
+                'course_name': score.course.name if score.course else None,
+                'composite_score': composite_score,
+                'risk_level': risk_level,
+                'result': result
+            })
 
         return Response({
             'code': 200,
@@ -134,29 +179,10 @@ class WarningCalculateView(APIView):
             'data': {
                 'created': created_count,
                 'updated': updated_count,
+                'model_used': 'random_forest' if use_ml else 'weighted',
+                'results': calculation_results[:10] if student_id else None  # 单学生时返回详情
             }
         })
-
-    def _calculate_composite_score(self, score):
-        """计算综合得分
-        权重：出勤30%、进度20%、作业30%、考试20%
-        """
-        attendance = float(score.attendance_rate or 0) * 0.3
-        progress = float(score.video_progress or 0) * 0.2
-        homework = float(score.homework_avg or 0) * 0.3
-        exam = float(score.exam_avg or 0) * 0.2
-        return round(attendance + progress + homework + exam, 2)
-
-    def _determine_risk_level(self, score):
-        """确定风险等级"""
-        if score < 60:
-            return 'high'      # 红色预警
-        elif score < 75:
-            return 'medium'    # 橙色预警
-        elif score < 85:
-            return 'low'       # 黄色预警
-        else:
-            return 'normal'    # 正常
 
 
 class WarningResolveView(APIView):
