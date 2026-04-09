@@ -52,6 +52,8 @@ INSTALLED_APPS = [
     "school_analysis",
     "interventions",
     "warning_system",
+    "import_app",
+    "teacher_dashboard",
 ]
 
 MIDDLEWARE = [
