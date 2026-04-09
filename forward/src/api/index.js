@@ -8,3 +8,6 @@ export { default as request } from './request'
 
 // 学生端API
 export * from './student'
+
+// 教师端API
+export * from './teacher'

@@ -33,6 +33,32 @@ const routes = [
     ]
   },
   {
+    path: '/teacher',
+    name: 'TeacherLayout',
+    component: () => import('@/components/TeacherLayout.vue'),
+    children: [
+      {
+        path: '',
+        redirect: '/teacher/dashboard'
+      },
+      {
+        path: 'dashboard',
+        name: 'TeacherDashboard',
+        component: () => import('@/views/teacher/Dashboard.vue')
+      },
+      {
+        path: 'courses/:courseId/students',
+        name: 'TeacherCourseStudents',
+        component: () => import('@/views/teacher/CourseStudents.vue')
+      },
+      {
+        path: 'upload',
+        name: 'TeacherUpload',
+        component: () => import('@/views/teacher/UploadData.vue')
+      }
+    ]
+  },
+  {
     path: '/',
     redirect: '/login'
   }
