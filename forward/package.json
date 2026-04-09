@@ -1,0 +1,27 @@
+{
+  "name": "academic-warning-system",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "lint": "vue-cli-service lint"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "axios": "^1.6.5",
+    "core-js": "^3.35.0",
+    "echarts": "^5.4.3",
+    "element-plus": "^2.5.1",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.5",
+    "vue-router": "^4.2.5",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "~5.0.8",
+    "@vue/cli-service": "~5.0.8",
+    "sass": "^1.69.7",
+    "sass-loader": "^13.3.3"
+  }
+}
