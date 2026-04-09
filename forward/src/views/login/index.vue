@@ -10,7 +10,7 @@
           <el-input v-model="form.password" type="password" placeholder="密码" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" style="width: 100%" @click="handleLogin">登录</el-button>
+          <el-button type="primary" style="width: 100%" @click="handleLogin" :loading="loading">登录</el-button>
         </el-form-item>
       </el-form>
     </div>
@@ -21,14 +21,39 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import request from '@/api/request'
 
 const router = useRouter()
 const form = ref({ username: '', password: '' })
+const loading = ref(false)
 
-const handleLogin = () => {
-  // 简化登录，直接跳转到学生端
-  ElMessage.success('登录成功')
-  router.push('/student')
+const handleLogin = async () => {
+  if (!form.value.username || !form.value.password) {
+    ElMessage.warning('请输入用户名和密码')
+    return
+  }
+
+  loading.value = true
+  try {
+    const res = await request({
+      url: '/auth/login/',
+      method: 'post',
+      data: form.value
+    })
+
+    if (res.code === 200) {
+      // 保存用户信息
+      localStorage.setItem('userInfo', JSON.stringify(res.data))
+      ElMessage.success('登录成功')
+      router.push('/student')
+    } else {
+      ElMessage.error(res.message || '登录失败')
+    }
+  } catch (error) {
+    ElMessage.error('登录失败，请检查用户名和密码')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

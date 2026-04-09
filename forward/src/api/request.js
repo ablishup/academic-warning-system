@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 const request = axios.create({
     baseURL: 'http://localhost:8000/api',
     timeout: 10000,
+    withCredentials: true,  // 允许携带cookie（Session认证）
     headers: {
         'Content-Type': 'application/json'
     }

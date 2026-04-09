@@ -103,11 +103,13 @@ export function getExamResults(params = {}) {
 
 /**
  * 获取学生的课程列表
+ * @param {number} studentId - 学生ID
  */
-export function getStudentCourses() {
+export function getStudentCourses(studentId) {
     return request({
         url: '/courses/student/',
-        method: 'get'
+        method: 'get',
+        params: { student_id: studentId }
     })
 }
 
