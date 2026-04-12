@@ -20,6 +20,52 @@ from .serializers import (
     StudentCourseScoreSerializer,
     WarningStatsSerializer,
 )
+from .data_sync import DataSynchronizer
+
+
+def get_student_from_user(user):
+    """从当前登录用户获取学生ID"""
+    if not user or not user.is_authenticated:
+        return None
+
+    # 方法1: 通过 username 匹配 name（学号）
+    # 注意：数据库中 name 字段存的是学号，student_no 存的是姓名
+    student = Student.objects.filter(name=user.username).first()
+    if student:
+        return student.id
+
+    # 方法2: 通过 first_name 匹配 student_no（姓名）
+    if user.first_name:
+        student = Student.objects.filter(student_no=user.first_name).first()
+        if student:
+            return student.id
+
+    # 方法3: 通过 username 匹配 student_no（兼容旧数据）
+    student = Student.objects.filter(student_no=user.username).first()
+    if student:
+        return student.id
+
+    # 方法4: 通过 username 解析 (如 student_1 -> id=1)
+    if user.username.startswith('student_'):
+        try:
+            student_id = int(user.username.split('_')[1])
+            student = Student.objects.filter(id=student_id).first()
+            if student:
+                return student.id
+        except (ValueError, IndexError):
+            pass
+
+    # 方法5: 通过 profile 关联 (如果存在)
+    try:
+        profile = getattr(user, 'profile', None)
+        if profile and hasattr(profile, 'employee_no') and profile.employee_no:
+            student = Student.objects.filter(name=profile.employee_no).first()
+            if student:
+                return student.id
+    except:
+        pass
+
+    return None
 
 
 class WarningRecordListView(generics.ListAPIView):
@@ -39,6 +85,10 @@ class WarningRecordListView(generics.ListAPIView):
         status = self.request.query_params.get('status')
         student_id = self.request.query_params.get('student_id')
         course_id = self.request.query_params.get('course_id')
+
+        # 如果没有提供student_id，尝试从当前用户推断
+        if not student_id:
+            student_id = get_student_from_user(self.request.user)
 
         if risk_level:
             queryset = queryset.filter(risk_level=risk_level)
@@ -259,9 +309,102 @@ class StudentCourseScoreListView(generics.ListAPIView):
         student_id = self.request.query_params.get('student_id')
         course_id = self.request.query_params.get('course_id')
 
+        # 如果没有提供student_id，尝试从当前用户推断
+        if not student_id:
+            student_id = get_student_from_user(self.request.user)
+
         if student_id:
             queryset = queryset.filter(student_id=student_id)
         if course_id:
             queryset = queryset.filter(course_id=course_id)
 
         return queryset.select_related('student', 'course')
+
+
+class SyncStudentScoresView(APIView):
+    """同步学生课程得分视图"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """触发数据同步"""
+        try:
+            # 获取参数
+            student_id = request.data.get('student_id')
+            course_id = request.data.get('course_id')
+            sync_all = request.data.get('sync_all', False)
+
+            if sync_all:
+                # 同步所有学生
+                results = DataSynchronizer.sync_all_students_scores()
+                success_count = sum(1 for r in results if r['status'] == 'success')
+
+                return Response({
+                    'code': 200,
+                    'message': '数据同步完成',
+                    'data': {
+                        'total': len(results),
+                        'success': success_count,
+                        'failed': len(results) - success_count
+                    }
+                })
+            elif student_id and course_id:
+                # 同步单个学生
+                score = DataSynchronizer.calculate_student_course_score(
+                    student_id, course_id
+                )
+                return Response({
+                    'code': 200,
+                    'message': '同步成功',
+                    'data': {
+                        'student_id': student_id,
+                        'course_id': course_id,
+                        'attendance_rate': score.attendance_rate,
+                        'video_progress': score.video_progress,
+                        'homework_avg': score.homework_avg,
+                        'exam_avg': score.exam_avg,
+                    }
+                })
+            else:
+                return Response({
+                    'code': 400,
+                    'message': '参数错误：请提供 student_id 和 course_id，或设置 sync_all=true'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({
+                'code': 500,
+                'message': f'同步失败: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SyncStatusView(APIView):
+    """获取数据同步状态视图"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """获取同步统计信息"""
+        stats = DataSynchronizer.get_sync_statistics()
+
+        # 获取最近同步的得分记录
+        recent_scores = StudentCourseScore.objects.select_related(
+            'student', 'course'
+        ).order_by('-last_calculated')[:5]
+
+        recent_list = []
+        for score in recent_scores:
+            recent_list.append({
+                'student_name': score.student.name if score.student else None,
+                'student_no': score.student.student_no if score.student else None,
+                'course_name': score.course.name if score.course else None,
+                'final_score': score.final_score,
+                'last_calculated': score.last_calculated
+            })
+
+        return Response({
+            'code': 200,
+            'message': '获取成功',
+            'data': {
+                'statistics': stats,
+                'recent_synced': recent_list
+            }
+        })

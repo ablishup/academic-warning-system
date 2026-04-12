@@ -41,7 +41,10 @@ class InterventionRecordListView(generics.ListAPIView):
         if intervention_type:
             queryset = queryset.filter(intervention_type=intervention_type)
         if is_effective is not None:
-            queryset = queryset.filter(is_effective=is_effective)
+            if is_effective == 'true':
+                queryset = queryset.filter(is_effective=1)
+            elif is_effective == 'false':
+                queryset = queryset.filter(is_effective=0)
         if follow_up_needed is not None:
             queryset = queryset.filter(follow_up_needed=follow_up_needed)
 
@@ -69,6 +72,17 @@ class InterventionRecordCreateView(generics.CreateAPIView):
     def perform_create(self, serializer):
         serializer.save(intervenor=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response({
+            'code': 200,
+            'message': '创建成功',
+            'data': serializer.data
+        }, status=status.HTTP_201_CREATED, headers=headers)
+
 
 class InterventionRecordUpdateView(generics.UpdateAPIView):
     """干预记录更新视图"""
@@ -76,11 +90,81 @@ class InterventionRecordUpdateView(generics.UpdateAPIView):
     serializer_class = InterventionRecordUpdateSerializer
     queryset = InterventionRecord.objects.all()
 
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response({
+            'code': 200,
+            'message': '更新成功',
+            'data': InterventionRecordDetailSerializer(instance).data
+        })
+
 
 class InterventionRecordDeleteView(generics.DestroyAPIView):
     """干预记录删除视图"""
     permission_classes = [IsAuthenticated]
     queryset = InterventionRecord.objects.all()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({
+            'code': 200,
+            'message': '删除成功'
+        })
+
+
+class InterventionEvaluateView(APIView):
+    """评估干预效果视图"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            intervention = InterventionRecord.objects.get(pk=pk)
+        except InterventionRecord.DoesNotExist:
+            return Response({
+                'code': 404,
+                'message': '干预记录不存在'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        effectiveness = request.data.get('effectiveness')
+        evaluation_notes = request.data.get('evaluation_notes', '')
+
+        if not effectiveness:
+            return Response({
+                'code': 400,
+                'message': '请提供评估结果'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 映射 effectiveness 到 is_effective
+        mapping = {
+            'effective': 1,
+            'partial': 1,
+            'ineffective': 0,
+            'pending': 2
+        }
+        intervention.is_effective = mapping.get(effectiveness, 2)
+        intervention.result = evaluation_notes
+
+        # 如果标记为有效或部分有效，自动更新跟进状态
+        if effectiveness in ['effective', 'partial']:
+            intervention.follow_up_needed = 0
+
+        intervention.save()
+
+        return Response({
+            'code': 200,
+            'message': '评估成功',
+            'data': {
+                'id': intervention.id,
+                'effectiveness': effectiveness,
+                'is_completed': intervention.follow_up_needed == 0
+            }
+        })
 
 
 class InterventionStatsView(APIView):
@@ -97,9 +181,9 @@ class InterventionStatsView(APIView):
         stats = queryset.aggregate(
             total_interventions=Count('id'),
             talk_count=Count('id', filter=Q(intervention_type='talk')),
-            parent_contact_count=Count('id', filter=Q(intervention_type='parent_contact')),
-            study_plan_count=Count('id', filter=Q(intervention_type='study_plan')),
-            tutor_count=Count('id', filter=Q(intervention_type='tutor')),
+            academic_count=Count('id', filter=Q(intervention_type='academic')),
+            psychological_count=Count('id', filter=Q(intervention_type='psychological')),
+            family_count=Count('id', filter=Q(intervention_type='family')),
             other_count=Count('id', filter=Q(intervention_type='other')),
             effective_count=Count('id', filter=Q(is_effective=1)),
             ineffective_count=Count('id', filter=Q(is_effective=0)),
@@ -107,10 +191,37 @@ class InterventionStatsView(APIView):
             follow_up_needed_count=Count('id', filter=Q(follow_up_needed=1)),
         )
 
+        # 计算本月新增
+        this_month = queryset.filter(
+            created_at__gte=timezone.now().replace(day=1, hour=0, minute=0, second=0)
+        ).count()
+
+        # 构建按类型统计
+        by_type = {
+            'talk': stats['talk_count'],
+            'academic': stats['academic_count'],
+            'psychological': stats['psychological_count'],
+            'family': stats['family_count'],
+            'other': stats['other_count'],
+        }
+
+        # 构建按效果统计
+        by_effectiveness = {
+            'effective': stats['effective_count'],
+            'ineffective': stats['ineffective_count'],
+            'pending': stats['pending_count'],
+        }
+
         return Response({
             'code': 200,
             'message': '获取成功',
-            'data': stats
+            'data': {
+                'total': stats['total_interventions'],
+                'completed': stats['total_interventions'] - stats['follow_up_needed_count'],
+                'by_type': by_type,
+                'by_effectiveness': by_effectiveness,
+                'this_month': this_month
+            }
         })
 
 

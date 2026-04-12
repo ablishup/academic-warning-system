@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学生端API测试</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #1e293b;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            color: #3b82f6;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .api-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid #e2e8f0;
+        }
+        .api-item.success { border-left-color: #10b981; }
+        .api-item.error { border-left-color: #ef4444; }
+        .api-item.pending { border-left-color: #f59e0b; }
+        .api-name { font-weight: 500; color: #1e293b; }
+        .api-status {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .api-status.success { background: #d1fae5; color: #059669; }
+        .api-status.error { background: #fee2e2; color: #dc2626; }
+        .api-status.pending { background: #fef3c7; color: #d97706; }
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        .btn:hover { background: #2563eb; }
+        .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+        .result-panel {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        .config-panel {
+            background: #eff6ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .config-panel input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 学生端API测试工具</h1>
+
+        <div class="config-panel">
+            <h3>配置</h3>
+            <input type="text" id="baseUrl" placeholder="API基础地址" value="http://localhost:8000/api">
+            <input type="text" id="token" placeholder="登录Token（可选）">
+        </div>
+
+        <button class="btn" onclick="runAllTests()">运行全部测试</button>
+
+        <div class="test-section">
+            <h2>📚 课程相关</h2>
+            <div class="api-item pending" id="test-courses">
+                <span class="api-name">GET /courses/student/ - 学生课程列表</span>
+                <span class="api-status pending">待测试</span>
+            </div>
+            <div class="api-item pending" id="test-resources">
+                <span class="api-name">GET /courses/resources/ - 课程资源</span>
+                <span class="api-status pending">待测试</span>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 学习相关</h2>
+            <div class="api-item pending" id="test-activities">
+                <span class="api-name">GET /learning/activities/ - 学习活动</span>
+                <span class="api-status pending">待测试</span>
+            </div>
+            <div class="api-item pending" id="test-homework">
+                <span class="api-name">GET /learning/homework/stats/ - 作业统计</span>
+                <span class="api-status pending">待测试</span>
+            </div>
+            <div class="api-item pending" id="test-exams">
+                <span class="api-name">GET /learning/exams/stats/ - 考试统计</span>
+                <span class="api-status pending">待测试</span>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>⚠️ 预警相关</h2>
+            <div class="api-item pending" id="test-warnings">
+                <span class="api-name">GET /warnings/ - 预警记录</span>
+                <span class="api-status pending">待测试</span>
+            </div>
+            <div class="api-item pending" id="test-warning-stats">
+                <span class="api-name">GET /warnings/stats/ - 预警统计</span>
+                <span class="api-status pending">待测试</span>
+            </div>
+        </div>
+
+        <div class="result-panel" id="resultPanel"></div>
+    </div>
+
+    <script>
+        const API_TESTS = [
+            { id: 'test-courses', name: '学生课程列表', method: 'GET', endpoint: '/courses/student/' },
+            { id: 'test-resources', name: '课程资源', method: 'GET', endpoint: '/courses/resources/?course_id=1' },
+            { id: 'test-activities', name: '学习活动', method: 'GET', endpoint: '/learning/activities/' },
+            { id: 'test-homework', name: '作业统计', method: 'GET', endpoint: '/learning/homework/stats/' },
+            { id: 'test-exams', name: '考试统计', method: 'GET', endpoint: '/learning/exams/stats/' },
+            { id: 'test-warnings', name: '预警记录', method: 'GET', endpoint: '/warnings/' },
+            { id: 'test-warning-stats', name: '预警统计', method: 'GET', endpoint: '/warnings/stats/' }
+        ];
+
+        function updateStatus(id, status, message) {
+            const el = document.getElementById(id);
+            const statusEl = el.querySelector('.api-status');
+            el.className = `api-item ${status}`;
+            statusEl.className = `api-status ${status}`;
+            statusEl.textContent = message;
+        }
+
+        function log(message) {
+            const panel = document.getElementById('resultPanel');
+            panel.style.display = 'block';
+            panel.innerHTML += message + '\n';
+            panel.scrollTop = panel.scrollHeight;
+        }
+
+        async function testAPI(test) {
+            const baseUrl = document.getElementById('baseUrl').value.replace(/\/$/, '');
+            const token = document.getElementById('token').value;
+
+            updateStatus(test.id, 'pending', '测试中...');
+
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                const url = baseUrl + test.endpoint;
+                log(`[${test.method}] ${url}`);
+
+                const response = await fetch(url, {
+                    method: test.method,
+                    headers: headers
+                });
+
+                if (response.status === 200) {
+                    const data = await response.json();
+                    updateStatus(test.id, 'success', '成功');
+                    log(`✅ 成功: ${JSON.stringify(data).substring(0, 100)}...`);
+                    return true;
+                } else if (response.status === 401) {
+                    updateStatus(test.id, 'error', '需要登录');
+                    log(`❌ 需要登录 (401)`);
+                    return false;
+                } else {
+                    updateStatus(test.id, 'error', `错误 ${response.status}`);
+                    log(`❌ 错误: ${response.status}`);
+                    return false;
+                }
+            } catch (error) {
+                updateStatus(test.id, 'error', '网络错误');
+                log(`❌ 异常: ${error.message}`);
+                return false;
+            }
+        }
+
+        async function runAllTests() {
+            document.getElementById('resultPanel').innerHTML = '';
+            log('开始测试...');
+
+            for (const test of API_TESTS) {
+                await testAPI(test);
+                await new Promise(r => setTimeout(r, 500)); // 间隔500ms
+            }
+
+            log('测试完成');
+        }
+    </script>
+</body>
+</html>

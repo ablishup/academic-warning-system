@@ -73,18 +73,16 @@ def clean_person_data():
     df = df.dropna(subset=['user_name'])
 
     # 字段重命名
+    # 注意：user_name是姓名，login_name是学号
     column_mapping = {
         'id': 'original_id',
         'personid': 'personid',
-        'user_name': 'student_no',
-        'login_name': 'login_name',
+        'user_name': 'name',        # 姓名
+        'login_name': 'student_no', # 学号
         'role': 'role',
         'fid': 'fid',
     }
     df = df.rename(columns=column_mapping)
-
-    # 添加name字段(使用login_name或student_no作为备用)
-    df['name'] = df.get('login_name', df['student_no'])
 
     # 选择需要的字段
     needed_columns = ['original_id', 'personid', 'student_no', 'name', 'role', 'fid']

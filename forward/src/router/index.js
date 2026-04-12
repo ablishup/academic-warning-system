@@ -55,6 +55,68 @@ const routes = [
         path: 'upload',
         name: 'TeacherUpload',
         component: () => import('@/views/teacher/UploadData.vue')
+      },
+      {
+        path: 'resources',
+        name: 'TeacherResources',
+        component: () => import('@/views/teacher/Resources.vue')
+      }
+    ]
+  },
+  {
+    path: '/counselor',
+    name: 'CounselorLayout',
+    component: () => import('@/components/CounselorLayout.vue'),
+    children: [
+      {
+        path: '',
+        redirect: '/counselor/dashboard'
+      },
+      {
+        path: 'dashboard',
+        name: 'CounselorDashboard',
+        component: () => import('@/views/counselor/Dashboard.vue')
+      },
+      {
+        path: 'warnings',
+        name: 'CounselorWarnings',
+        component: () => import('@/views/counselor/Warnings.vue')
+      },
+      {
+        path: 'interventions',
+        name: 'CounselorInterventions',
+        component: () => import('@/views/counselor/Interventions.vue')
+      }
+    ]
+  },
+  {
+    path: '/admin',
+    name: 'AdminLayout',
+    component: () => import('@/components/AdminLayout.vue'),
+    children: [
+      {
+        path: '',
+        redirect: '/admin/dashboard'
+      },
+      {
+        path: 'dashboard',
+        name: 'AdminDashboard',
+        component: () => import('@/views/admin/Dashboard.vue')
+      },
+      {
+        path: 'users',
+        name: 'AdminUsers',
+        component: () => import('@/views/admin/Users.vue')
+      },
+      {
+        path: 'courses',
+        name: 'AdminCourses',
+        component: () => import('@/views/admin/Courses.vue')
+      },
+      {
+        path: 'classes',
+        name: 'AdminClasses',
+        component: () => import('@/views/admin/Classes.vue')
       }
     ]
   },

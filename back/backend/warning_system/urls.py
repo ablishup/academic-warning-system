@@ -15,4 +15,8 @@ urlpatterns = [
 
     # 学生课程得分
     path('scores/', views.StudentCourseScoreListView.as_view(), name='student-course-scores'),
+
+    # 数据同步
+    path('sync-scores/', views.SyncStudentScoresView.as_view(), name='sync-scores'),
+    path('sync-status/', views.SyncStatusView.as_view(), name='sync-status'),
 ]

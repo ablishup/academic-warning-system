@@ -1,4 +1,4 @@
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, Q, Max, Min
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics, status, filters
@@ -24,6 +24,51 @@ from .serializers import (
 )
 
 
+def get_student_from_user(user):
+    """从当前登录用户获取学生ID"""
+    if not user or not user.is_authenticated:
+        return None
+
+    # 方法1: 通过 username 匹配 name（学号）
+    # 注意：数据库中 name 字段存的是学号，student_no 存的是姓名
+    student = Student.objects.filter(name=user.username).first()
+    if student:
+        return student.id
+
+    # 方法2: 通过 first_name 匹配 student_no（姓名）
+    if user.first_name:
+        student = Student.objects.filter(student_no=user.first_name).first()
+        if student:
+            return student.id
+
+    # 方法3: 通过 username 匹配 student_no（兼容旧数据）
+    student = Student.objects.filter(student_no=user.username).first()
+    if student:
+        return student.id
+
+    # 方法4: 通过 username 解析 (如 student_1 -> id=1)
+    if user.username.startswith('student_'):
+        try:
+            student_id = int(user.username.split('_')[1])
+            student = Student.objects.filter(id=student_id).first()
+            if student:
+                return student.id
+        except (ValueError, IndexError):
+            pass
+
+    # 方法5: 通过 profile 关联 (如果存在)
+    try:
+        profile = getattr(user, 'profile', None)
+        if profile and hasattr(profile, 'employee_no') and profile.employee_no:
+            student = Student.objects.filter(name=profile.employee_no).first()
+            if student:
+                return student.id
+    except:
+        pass
+
+    return None
+
+
 # ==================== 学习活动 API ====================
 
 class LearningActivityRecordView(APIView):
@@ -46,10 +91,14 @@ class LearningActivityRecordView(APIView):
         activity_type = data.get('activity_type')
         activity_name = data.get('activity_name')
 
+        # 如果没有提供student_id，尝试从当前用户推断
+        if not student_id:
+            student_id = get_student_from_user(request.user)
+
         # 检查学生是否存在
         try:
             student = Student.objects.get(id=student_id)
-        except Student.DoesNotExist:
+        except (Student.DoesNotExist, TypeError):
             return Response({
                 'code': 404,
                 'message': '学生不存在'
@@ -175,6 +224,10 @@ class LearningActivityListView(generics.ListAPIView):
         course_id = self.request.query_params.get('course_id')
         activity_type = self.request.query_params.get('type')
 
+        # 如果没有提供student_id，尝试从当前用户推断
+        if not student_id:
+            student_id = get_student_from_user(self.request.user)
+
         if student_id:
             queryset = queryset.filter(student_id=student_id)
         if course_id:
@@ -192,6 +245,10 @@ class LearningActivitySummaryView(generics.GenericAPIView):
     def get(self, request):
         student_id = request.query_params.get('student_id')
         course_id = request.query_params.get('course_id')
+
+        # 如果没有提供student_id，尝试从当前用户推断
+        if not student_id:
+            student_id = get_student_from_user(request.user)
 
         queryset = LearningActivity.objects.all()
         if student_id:
@@ -261,6 +318,10 @@ class HomeworkSubmissionListView(generics.ListAPIView):
         course_id = self.request.query_params.get('course_id')
         assignment_id = self.request.query_params.get('assignment_id')
 
+        # 如果没有提供student_id，尝试从当前用户推断
+        if not student_id:
+            student_id = get_student_from_user(self.request.user)
+
         if student_id:
             queryset = queryset.filter(student_id=student_id)
         if assignment_id:
@@ -289,6 +350,10 @@ class StudentHomeworkStatsView(generics.GenericAPIView):
         student_id = request.query_params.get('student_id')
         course_id = request.query_params.get('course_id')
 
+        # 如果没有提供student_id，尝试从当前用户推断
+        if not student_id:
+            student_id = get_student_from_user(request.user)
+
         if not student_id:
             return Response({
                 'code': 400,
@@ -306,12 +371,14 @@ class StudentHomeworkStatsView(generics.GenericAPIView):
         )
 
         # 获取该学生在该课程的总作业数
-        total_query = HomeworkAssignment.objects.filter(
-            course_enrollments__student_id=student_id
-        )
+        # 简化：直接计算该课程的作业总数
         if course_id:
-            total_query = total_query.filter(course_id=course_id)
-        total_assignments = total_query.count()
+            total_assignments = HomeworkAssignment.objects.filter(course_id=course_id).count()
+        else:
+            # 获取学生选修的所有课程的作业总数
+            from courses.models import CourseEnrollment
+            enrolled_courses = CourseEnrollment.objects.filter(student_id=student_id).values_list('course_id', flat=True)
+            total_assignments = HomeworkAssignment.objects.filter(course_id__in=enrolled_courses).count()
 
         on_time_rate = 0
         if stats['submitted_count'] and stats['submitted_count'] > 0:
@@ -380,6 +447,10 @@ class ExamResultListView(generics.ListAPIView):
         course_id = self.request.query_params.get('course_id')
         exam_id = self.request.query_params.get('exam_id')
 
+        # 如果没有提供student_id，尝试从当前用户推断
+        if not student_id:
+            student_id = get_student_from_user(self.request.user)
+
         if student_id:
             queryset = queryset.filter(student_id=student_id)
         if exam_id:
@@ -408,6 +479,10 @@ class StudentExamStatsView(generics.GenericAPIView):
         student_id = request.query_params.get('student_id')
         course_id = request.query_params.get('course_id')
 
+        # 如果没有提供student_id，尝试从当前用户推断
+        if not student_id:
+            student_id = get_student_from_user(request.user)
+
         if not student_id:
             return Response({
                 'code': 400,
@@ -426,12 +501,13 @@ class StudentExamStatsView(generics.GenericAPIView):
         )
 
         # 获取总考试数
-        total_query = ExamAssignment.objects.filter(
-            course_enrollments__student_id=student_id
-        )
         if course_id:
-            total_query = total_query.filter(course_id=course_id)
-        total_exams = total_query.count()
+            total_exams = ExamAssignment.objects.filter(course_id=course_id).count()
+        else:
+            # 获取学生选修的所有课程的考试总数
+            from courses.models import CourseEnrollment
+            enrolled_courses = CourseEnrollment.objects.filter(student_id=student_id).values_list('course_id', flat=True)
+            total_exams = ExamAssignment.objects.filter(course_id__in=enrolled_courses).count()
 
         return Response({
             'code': 200,
@@ -447,8 +523,6 @@ class StudentExamStatsView(generics.GenericAPIView):
 
 
 # ==================== 综合统计 API ====================
-
-from django.db.models import Max, Min
 
 
 class CourseLearningStatsView(generics.GenericAPIView):
@@ -489,9 +563,8 @@ class CourseLearningStatsView(generics.GenericAPIView):
         ).aggregate(avg_score=Avg('score'))
 
         # 学生人数
-        student_count = Student.objects.filter(
-            course_enrollments__course_id=course_id
-        ).count()
+        from courses.models import CourseEnrollment
+        student_count = CourseEnrollment.objects.filter(course_id=course_id).count()
 
         return Response({
             'code': 200,
@@ -502,6 +575,6 @@ class CourseLearningStatsView(generics.GenericAPIView):
                 'student_count': student_count,
                 'avg_video_progress': round(video_stats['avg_progress'] or 0, 2),
                 'avg_homework_score': round(homework_stats['avg_score'] or 0, 2),
-                'avg_exam_score': round(exam_stats['avg_score'] or 0, 2)
+                'avg_exam_score': round(exam_stats['avg_score'] or 2)
             }
         })

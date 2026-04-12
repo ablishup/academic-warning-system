@@ -212,6 +212,19 @@ export function getCourseLearningStats(params = {}) {
 }
 
 /**
+ * 获取AI智能评语
+ * 注意：AI生成需要较长时间，设置30秒超时
+ */
+export function getAIComment(data) {
+    return request({
+        url: '/ai/comment/',
+        method: 'post',
+        data,
+        timeout: 30000  // 30秒超时，因为DeepSeek API可能需要较长时间
+    })
+}
+
+/**
  * 获取学生学情汇总（整合多个接口的数据）
  * 用于Analysis.vue页面
  */

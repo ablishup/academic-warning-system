@@ -20,6 +20,58 @@
       </div>
     </div>
 
+    <!-- AI智能评语 -->
+    <el-card v-if="aiComment" class="ai-comment-card" shadow="hover" v-loading="generating" element-loading-text="AI正在生成评语，请稍候...">
+      <div class="ai-header">
+        <div class="ai-icon">
+          <el-icon :size="24"><MagicStick /></el-icon>
+        </div>
+        <div class="ai-title">
+          <h3>AI学习评语</h3>
+          <p>基于你的学习数据智能生成</p>
+        </div>
+        <el-tag :type="aiComment.isMock ? 'warning' : 'primary'" size="small" effect="dark">
+          {{ aiComment.isMock ? '本地模拟' : 'AI生成' }}
+        </el-tag>
+      </div>
+      <el-divider />
+      <div class="ai-content">
+        <p class="comment-text">{{ aiComment.comment }}</p>
+        <div class="suggestion-list" v-if="aiComment.suggestions?.length">
+          <h4><el-icon><Star /></el-icon> 学习建议</h4>
+          <ul>
+            <li v-for="(suggestion, index) in aiComment.suggestions" :key="index">
+              {{ suggestion }}
+            </li>
+          </ul>
+        </div>
+        <div class="prediction-section" v-if="aiComment.prediction">
+          <el-alert
+            :title="`期末成绩预测: ${aiComment.prediction.score}分`"
+            :type="aiComment.prediction.type"
+            :description="aiComment.prediction.advice"
+            show-icon
+            :closable="false"
+          />
+        </div>
+        <el-alert
+          v-if="aiComment.isMock"
+          title="AI服务响应超时，当前为本地模拟数据"
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-top: 12px"
+        />
+      </div>
+      <div class="ai-footer">
+        <el-button type="primary" link size="small" @click="regenerateComment" :loading="generating">
+          <el-icon><Refresh /></el-icon>
+          {{ generating ? '生成中...' : '重新生成' }}
+        </el-button>
+        <span class="generate-time">生成时间: {{ aiComment.generateTime }}</span>
+      </div>
+    </el-card>
+
     <!-- 预警卡片 -->
     <el-card v-if="currentWarning" class="warning-card" :class="currentWarning.risk_level">
       <div class="warning-header">
@@ -36,7 +88,7 @@
       </div>
       <el-divider />
       <div class="suggestion-section" v-if="currentWarning.suggestion">
-        <h4><el-icon><LightBulb /></el-icon> 学习建议</h4>
+        <h4><el-icon><MagicStick /></el-icon> 学习建议</h4>
         <p class="suggestion-text">{{ currentWarning.suggestion }}</p>
       </div>
     </el-card>
@@ -182,20 +234,39 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import {
-  WarningFilled, LightBulb, Clock, DocumentChecked, TrendCharts,
-  CircleCheck, ArrowUp, ArrowDown, PieChart, Timer, Refresh
+  WarningFilled, MagicStick, Clock, DocumentChecked, TrendCharts,
+  CircleCheck, ArrowUp, ArrowDown, PieChart, Timer, Refresh, Star
 } from '@element-plus/icons-vue'
 import {
-  getStudentAnalysisSummary, getLearningActivities, getHomeworkSubmissions, getExamResults
+  getStudentAnalysisSummary, getLearningActivities, getHomeworkSubmissions, getExamResults, getAIComment
 } from '@/api/student'
 
 const studentInfo = ref({ name: '同学' })
+
+// 从localStorage获取当前用户信息
+const loadUserInfo = () => {
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (userInfoStr) {
+    try {
+      const user = JSON.parse(userInfoStr)
+      studentInfo.value = {
+        name: user.first_name || user.username || '同学',
+        id: user.id,
+        username: user.username
+      }
+    } catch (e) {
+      console.error('解析用户信息失败:', e)
+    }
+  }
+}
 const currentWarning = ref(null)
 const learningStats = ref({})
 const homeworkStats = ref({})
 const examStats = ref({})
 const recentActivities = ref([])
 const chartPeriod = ref('week')
+const aiComment = ref(null)
+const generating = ref(false)
 
 const scoreChartRef = ref(null)
 const radarChartRef = ref(null)
@@ -373,8 +444,110 @@ const updateCharts = async () => {
   }
 }
 
+import { ElMessage } from 'element-plus'
+
+// 生成AI评语
+const generateAIComment = async () => {
+  generating.value = true
+  try {
+    // 调用后端DeepSeek API
+    const res = await getAIComment({
+      student_name: studentInfo.value.name || '同学',
+      learning: learningStats.value,
+      homework: homeworkStats.value,
+      exam: examStats.value,
+      warnings: currentWarning.value ? [currentWarning.value] : []
+    })
+
+    if (res.code === 200) {
+      const data = res.data
+      // 根据预测分数确定类型
+      const score = data.prediction?.score || 0
+      let type = 'info'
+      let advice = data.prediction?.assessment || ''
+
+      if (score >= 80) {
+        type = 'success'
+      } else if (score >= 60) {
+        type = 'warning'
+      } else {
+        type = 'error'
+      }
+
+      aiComment.value = {
+        comment: data.comment,
+        suggestions: data.suggestions,
+        prediction: {
+          score: score,
+          type: type,
+          advice: advice
+        },
+        generateTime: data.generateTime || new Date().toLocaleString('zh-CN'),
+        isMock: false  // 标记为AI生成
+      }
+    } else {
+      // 如果API调用失败，使用本地模拟
+      generateLocalComment()
+    }
+  } catch (error) {
+    console.error('生成评语失败:', error)
+    // API失败时使用本地模拟
+    generateLocalComment()
+  } finally {
+    generating.value = false
+  }
+}
+
+// 本地模拟评语生成（API不可用时备用）
+const generateLocalComment = () => {
+  const progress = learningStats.value.avg_progress || 0
+  const homeworkAvg = homeworkStats.value.avg_score || 0
+  const examAvg = examStats.value.avg_score || 0
+  const totalDuration = learningStats.value.total_duration || 0
+
+  let comment = ''
+  let suggestions = []
+  let prediction = { score: 0, type: 'info', advice: '' }
+
+  if (progress >= 80 && homeworkAvg >= 80 && examAvg >= 80) {
+    comment = `同学，你的学习表现非常优秀！视频学习进度达到${Math.round(progress)}%，作业和考试成绩都保持在较高水平。你展现出了良好的学习态度和自律能力，继续保持！`
+    suggestions = ['可以尝试学习一些拓展内容', '帮助其他同学解答问题', '关注学科前沿动态']
+    prediction = { score: 88, type: 'success', advice: '预计期末成绩优秀' }
+  } else if (progress >= 60 && homeworkAvg >= 60 && examAvg >= 60) {
+    comment = `同学，你的学习状态总体良好。视频学习进度为${Math.round(progress)}%，但还有一些提升空间。`
+    suggestions = ['增加课后复习时间', '认真分析作业错题', '多与老师和同学交流']
+    prediction = { score: 75, type: 'warning', advice: '预计期末成绩中等' }
+  } else {
+    comment = `同学，目前你的学习进度有些滞后（${Math.round(progress)}%），需要引起重视。`
+    suggestions = ['制定详细的学习计划', '优先补上落下的课程内容', '寻求老师或同学的帮助']
+    prediction = { score: 58, type: 'error', advice: '预计有挂科风险，需努力' }
+  }
+
+  if (totalDuration < 3600) {
+    suggestions.push('建议增加学习时间，每天至少学习1-2小时')
+  }
+
+  aiComment.value = {
+    comment,
+    suggestions,
+    prediction,
+    generateTime: new Date().toLocaleString('zh-CN'),
+    isMock: true  // 标记为本地模拟
+  }
+}
+
+// 重新生成评语
+const regenerateComment = () => {
+  generateAIComment()
+}
+
 onMounted(() => {
+  loadUserInfo() // 加载用户信息
   loadData()
+  // 加载数据后生成AI评语
+  setTimeout(() => {
+    generateAIComment()
+  }, 1000)
   window.addEventListener('resize', () => {
     scoreChart?.resize()
     radarChart?.resize()
@@ -626,5 +799,98 @@ onUnmounted(() => {
   font-size: 12px;
   color: #9ca3af;
   margin-left: auto;
+}
+
+/* AI评语卡片 */
+.ai-comment-card {
+  margin-bottom: 24px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  border: 1px solid #667eea30;
+}
+
+.ai-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ai-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.ai-title {
+  flex: 1;
+}
+
+.ai-title h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.ai-title p {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.ai-content {
+  padding: 0 10px;
+}
+
+.comment-text {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #374151;
+  margin-bottom: 20px;
+}
+
+.suggestion-list h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.suggestion-list ul {
+  padding-left: 20px;
+  color: #4b5563;
+  line-height: 2;
+}
+
+.suggestion-list li {
+  position: relative;
+}
+
+.suggestion-list li::marker {
+  color: #667eea;
+}
+
+.prediction-section {
+  margin-top: 20px;
+}
+
+.ai-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.generate-time {
+  font-size: 12px;
+  color: #9ca3af;
 }
 </style>

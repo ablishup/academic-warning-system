@@ -17,6 +17,7 @@ urlpatterns = [
     path("api/interventions/", include("interventions.urls")),
     path("api/import/", include("import_app.urls")),
     path("api/teacher/", include("teacher_dashboard.urls")),
+    path("api/ai/", include("ai_assistant.urls")),
 ]
 
 # 开发环境提供媒体文件服务

@@ -5,7 +5,7 @@
 """
 
 import pandas as pd
-from django.db.models import Avg, Count, Q, F, Sum
+from django.db.models import Avg, Count, Q, F, Sum, FloatField
 from django.db.models.functions import Coalesce
 
 from learning.models import (
@@ -84,10 +84,10 @@ class FeatureExtractor:
 
         # 视频学习统计
         stats = activities.aggregate(
-            avg_progress=Coalesce(Avg('progress'), 0),
+            avg_progress=Coalesce(Avg('progress'), 0, output_field=FloatField()),
             total_videos=Count('id'),
             completed_videos=Count('id', filter=Q(progress__gte=90)),
-            total_duration=Coalesce(Sum('duration'), 0),
+            total_duration=Coalesce(Sum('duration'), 0, output_field=FloatField()),
         )
 
         return {
@@ -112,7 +112,7 @@ class FeatureExtractor:
 
         # 作业统计
         stats = submissions.aggregate(
-            avg_score=Coalesce(Avg('score'), 0),
+            avg_score=Coalesce(Avg('score'), 0, output_field=FloatField()),
             submit_count=Count('id'),
             late_count=Count('id', filter=Q(is_late=1)),
             full_score_count=Count('id', filter=Q(score__gte=90)),
@@ -154,12 +154,12 @@ class FeatureExtractor:
 
         # 考试统计
         stats = results.aggregate(
-            avg_score=Coalesce(Avg('score'), 0),
+            avg_score=Coalesce(Avg('score'), 0, output_field=FloatField()),
             exam_count=Count('id'),
             pass_count=Count('id', filter=Q(score__gte=60)),
             high_score_count=Count('id', filter=Q(score__gte=90)),
-            max_score=Coalesce(Avg('score'), 0),
-            min_score=Coalesce(Avg('score'), 0),
+            max_score=Coalesce(Avg('score'), 0, output_field=FloatField()),
+            min_score=Coalesce(Avg('score'), 0, output_field=FloatField()),
         )
 
         # 获取应参加考试总数
@@ -207,7 +207,7 @@ class FeatureExtractor:
         ).values('date').annotate(
             daily_duration=Sum('duration')
         ).aggregate(
-            avg_daily_duration=Coalesce(Avg('daily_duration'), 0)
+            avg_daily_duration=Coalesce(Avg('daily_duration'), 0, output_field=FloatField())
         )
 
         return {

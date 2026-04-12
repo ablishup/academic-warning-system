@@ -221,12 +221,64 @@ def teacher_courses_view(request):
     })
 
 
+def get_student_from_user(user):
+    """从当前登录用户获取学生ID"""
+    if not user or not user.is_authenticated:
+        return None
+
+    from classes.models import Student
+
+    # 方法1: 通过 username 匹配 name（学号）
+    # 注意：数据库中 name 字段存的是学号，student_no 存的是姓名
+    student = Student.objects.filter(name=user.username).first()
+    if student:
+        return student.id
+
+    # 方法2: 通过 first_name 匹配 student_no（姓名）
+    if user.first_name:
+        student = Student.objects.filter(student_no=user.first_name).first()
+        if student:
+            return student.id
+
+    # 方法3: 通过 username 匹配 student_no（兼容旧数据）
+    student = Student.objects.filter(student_no=user.username).first()
+    if student:
+        return student.id
+
+    # 方法4: 通过 username 解析 (如 student_1 -> id=1)
+    if user.username.startswith('student_'):
+        try:
+            student_id = int(user.username.split('_')[1])
+            student = Student.objects.filter(id=student_id).first()
+            if student:
+                return student.id
+        except (ValueError, IndexError):
+            pass
+
+    # 方法5: 通过 profile 关联 (如果存在)
+    try:
+        profile = getattr(user, 'profile', None)
+        if profile and hasattr(profile, 'employee_no') and profile.employee_no:
+            student = Student.objects.filter(name=profile.employee_no).first()
+            if student:
+                return student.id
+    except:
+        pass
+
+    return None
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def student_courses_view(request):
     """获取学生选修的课程列表"""
     # 获取学生ID（从用户信息或其他方式获取）
     student_id = request.query_params.get('student_id')
+
+    # 如果没有提供student_id，尝试从当前用户推断
+    if not student_id:
+        student_id = get_student_from_user(request.user)
+
     if not student_id:
         return Response({
             'code': 400,

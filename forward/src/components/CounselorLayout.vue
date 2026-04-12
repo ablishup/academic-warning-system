@@ -3,23 +3,23 @@
     <el-aside width="240px" class="sidebar">
       <div class="logo">
         <el-icon :size="28"><School /></el-icon>
-        <span>教师工作台</span>
+        <span>辅导员工作台</span>
       </div>
 
-      <!-- 教师信息卡片 -->
-      <div class="profile-card" v-if="teacherInfo">
-        <el-avatar :size="48" :style="{ background: '#3b82f6' }">
-          {{ teacherInfo.name?.charAt(0) || 'T' }}
+      <!-- 辅导员信息卡片 -->
+      <div class="profile-card" v-if="counselorInfo">
+        <el-avatar :size="48" :style="{ background: '#10b981' }">
+          {{ counselorInfo.name?.charAt(0) || 'C' }}
         </el-avatar>
         <div class="profile-info">
-          <div class="profile-name">{{ teacherInfo.name || teacherInfo.username }}</div>
-          <div class="profile-no">工号: {{ teacherInfo.teacher_no }}</div>
+          <div class="profile-name">{{ counselorInfo.name || counselorInfo.username }}</div>
+          <div class="profile-no">工号: {{ counselorInfo.employee_no }}</div>
         </div>
         <div class="profile-meta">
-          <el-tag size="small" type="info">{{ teacherInfo.title || '教师' }}</el-tag>
-          <div class="profile-dept" :title="teacherInfo.department">
+          <el-tag size="small" type="success">辅导员</el-tag>
+          <div class="profile-dept" :title="counselorInfo.department">
             <el-icon><OfficeBuilding /></el-icon>
-            {{ teacherInfo.department || '暂无院系信息' }}
+            {{ counselorInfo.department || '暂无院系信息' }}
           </div>
         </div>
       </div>
@@ -32,17 +32,17 @@
         text-color="#94a3b8"
         active-text-color="#ffffff"
       >
-        <el-menu-item index="/teacher/dashboard">
+        <el-menu-item index="/counselor/dashboard">
           <el-icon><DataBoard /></el-icon>
-          <span>课程概览</span>
+          <span>学情总览</span>
         </el-menu-item>
-        <el-menu-item index="/teacher/upload">
-          <el-icon><Upload /></el-icon>
-          <span>数据上传</span>
+        <el-menu-item index="/counselor/warnings">
+          <el-icon><Warning /></el-icon>
+          <span>预警管理</span>
         </el-menu-item>
-        <el-menu-item index="/teacher/resources">
-          <el-icon><FolderOpened /></el-icon>
-          <span>教学资源</span>
+        <el-menu-item index="/counselor/interventions">
+          <el-icon><FirstAidKit /></el-icon>
+          <span>干预记录</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -54,10 +54,10 @@
         <div class="header-right">
           <el-dropdown>
             <span class="user-info">
-              <el-avatar :size="32" :style="{ background: '#3b82f6' }">
-                {{ teacherInfo?.name?.charAt(0) || 'T' }}
+              <el-avatar :size="32" :style="{ background: '#10b981' }">
+                {{ counselorInfo?.name?.charAt(0) || 'C' }}
               </el-avatar>
-              <span>{{ teacherInfo?.name || '教师' }}</span>
+              <span>{{ counselorInfo?.name || '辅导员' }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -76,48 +76,46 @@
 
     <!-- 个人信息详情弹窗 -->
     <el-dialog v-model="profileDialogVisible" title="个人信息" width="500px">
-      <el-descriptions :column="1" border v-if="teacherInfo">
-        <el-descriptions-item label="姓名">{{ teacherInfo.name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="用户名">{{ teacherInfo.username }}</el-descriptions-item>
-        <el-descriptions-item label="工号">{{ teacherInfo.teacher_no }}</el-descriptions-item>
-        <el-descriptions-item label="职称">{{ teacherInfo.title || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="院系">{{ teacherInfo.department || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="办公电话">{{ teacherInfo.phone || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="办公室">{{ teacherInfo.office || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="邮箱">{{ teacherInfo.email || '-' }}</el-descriptions-item>
+      <el-descriptions :column="1" border v-if="counselorInfo">
+        <el-descriptions-item label="姓名">{{ counselorInfo.name || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="用户名">{{ counselorInfo.username }}</el-descriptions-item>
+        <el-descriptions-item label="工号">{{ counselorInfo.employee_no }}</el-descriptions-item>
+        <el-descriptions-item label="院系">{{ counselorInfo.department || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="联系电话">{{ counselorInfo.phone || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="办公地点">{{ counselorInfo.office || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="邮箱">{{ counselorInfo.email || '-' }}</el-descriptions-item>
       </el-descriptions>
     </el-dialog>
   </el-container>
 </template>
 
 <script setup>
-import { School, DataBoard, Upload, UserFilled, ArrowDown, FolderOpened, OfficeBuilding } from '@element-plus/icons-vue'
+import { School, DataBoard, Warning, FirstAidKit, UserFilled, ArrowDown, OfficeBuilding } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { ref, onMounted } from 'vue'
-import { getCurrentTeacherProfile } from '@/api/admin'
+import { getCurrentCounselorProfile } from '@/api/admin'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
-const teacherInfo = ref(null)
+const counselorInfo = ref(null)
 const profileDialogVisible = ref(false)
 
-// 获取教师信息
-const loadTeacherInfo = async () => {
+// 获取辅导员信息
+const loadCounselorInfo = async () => {
   try {
-    const res = await getCurrentTeacherProfile()
+    const res = await getCurrentCounselorProfile()
     if (res.code === 200) {
-      teacherInfo.value = res.data
+      counselorInfo.value = res.data
     }
   } catch (error) {
-    console.error('获取教师信息失败:', error)
+    console.error('获取辅导员信息失败:', error)
     // 如果API失败，使用本地存储的用户信息
     const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-    if (userInfo.role === 'teacher') {
-      teacherInfo.value = {
+    if (userInfo.role === 'counselor') {
+      counselorInfo.value = {
         username: userInfo.username,
         name: userInfo.name || userInfo.username,
-        teacher_no: '未设置',
-        title: '教师',
+        employee_no: '未设置',
         department: '未设置'
       }
     }
@@ -134,7 +132,7 @@ const logout = () => {
 }
 
 onMounted(() => {
-  loadTeacherInfo()
+  loadCounselorInfo()
 })
 </script>
 
@@ -160,7 +158,7 @@ onMounted(() => {
   border-bottom: 1px solid #334155;
 }
 
-/* 教师信息卡片 */
+/* 辅导员信息卡片 */
 .profile-card {
   padding: 20px 16px;
   margin: 12px;
@@ -229,6 +227,11 @@ onMounted(() => {
   justify-content: space-between;
   box-shadow: 0 1px 4px rgba(0,0,0,0.1);
   z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
 }
 
 .header-right {

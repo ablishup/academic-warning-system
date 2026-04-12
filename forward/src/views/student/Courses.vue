@@ -171,8 +171,8 @@ const getCourseGradient = (id) => gradientMap[(id - 1) % gradientMap.length]
 const loadCourses = async () => {
   loading.value = true
   try {
-    const studentId = 1
-    const res = await getStudentCourses(studentId)
+    // 从用户信息获取 studentId 或让后端自动推断
+    const res = await getStudentCourses()
     if (res.code === 200) {
       const coursesWithStats = await Promise.all(
         res.data.map(async (course) => {

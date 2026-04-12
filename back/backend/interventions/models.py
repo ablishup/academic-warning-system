@@ -6,16 +6,16 @@ class InterventionRecord(models.Model):
     """干预记录表"""
     INTERVENTION_TYPE_CHOICES = [
         ('talk', '谈心谈话'),
-        ('parent_contact', '家长联系'),
-        ('study_plan', '制定学习计划'),
-        ('tutor', '安排辅导'),
+        ('academic', '学业帮扶'),
+        ('psychological', '心理疏导'),
+        ('family', '家校联系'),
         ('other', '其他'),
     ]
 
     EFFECTIVENESS_CHOICES = [
         (0, '无效'),
         (1, '有效'),
-        (2, '待观察'),
+        (2, '待评估'),
     ]
 
     id = models.AutoField(primary_key=True)

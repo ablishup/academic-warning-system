@@ -2,8 +2,8 @@
   <el-container class="layout">
     <el-aside width="220px" class="sidebar">
       <div class="logo">
-        <el-icon :size="28"><School /></el-icon>
-        <span>学业预警系统</span>
+        <el-icon :size="28"><Setting /></el-icon>
+        <span>系统管理</span>
       </div>
       <el-menu
         :default-active="$route.path"
@@ -13,17 +13,25 @@
         text-color="#94a3b8"
         active-text-color="#ffffff"
       >
-        <el-menu-item index="/student/analysis">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>学情分析</span>
+        <el-menu-item index="/admin/dashboard">
+          <el-icon><DataBoard /></el-icon>
+          <span>系统概览</span>
         </el-menu-item>
-        <el-menu-item index="/student/courses">
-          <el-icon><Collection /></el-icon>
-          <span>我的课程</span>
+        <el-menu-item index="/admin/users">
+          <el-icon><User /></el-icon>
+          <span>用户管理</span>
         </el-menu-item>
-        <el-menu-item index="/student/course-resources">
-          <el-icon><FolderOpened /></el-icon>
-          <span>课程资源</span>
+        <el-menu-item index="/admin/courses">
+          <el-icon><Reading /></el-icon>
+          <span>课程管理</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/classes">
+          <el-icon><School /></el-icon>
+          <span>班级管理</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/system">
+          <el-icon><Tools /></el-icon>
+          <span>系统设置</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -36,7 +44,7 @@
           <el-dropdown>
             <span class="user-info">
               <el-avatar :size="32" :icon="UserFilled" />
-              <span>学生</span>
+              <span>管理员</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -55,7 +63,7 @@
 </template>
 
 <script setup>
-import { School, DataAnalysis, Collection, FolderOpened, UserFilled, ArrowDown } from '@element-plus/icons-vue'
+import { Setting, DataBoard, User, Reading, School, Tools, UserFilled, ArrowDown } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
