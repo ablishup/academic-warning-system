@@ -28,24 +28,18 @@ def get_student_from_user(user):
     if not user or not user.is_authenticated:
         return None
 
-    # 方法1: 通过 username 匹配 name（学号）
-    # 注意：数据库中 name 字段存的是学号，student_no 存的是姓名
-    student = Student.objects.filter(name=user.username).first()
-    if student:
-        return student.id
-
-    # 方法2: 通过 first_name 匹配 student_no（姓名）
-    if user.first_name:
-        student = Student.objects.filter(student_no=user.first_name).first()
-        if student:
-            return student.id
-
-    # 方法3: 通过 username 匹配 student_no（兼容旧数据）
+    # 方法1: 通过 username 匹配 student_no（学号）
     student = Student.objects.filter(student_no=user.username).first()
     if student:
         return student.id
 
-    # 方法4: 通过 username 解析 (如 student_1 -> id=1)
+    # 方法2: 通过 first_name 匹配 name（姓名）
+    if user.first_name:
+        student = Student.objects.filter(name=user.first_name).first()
+        if student:
+            return student.id
+
+    # 方法3: 兼容旧账号（student_1）
     if user.username.startswith('student_'):
         try:
             student_id = int(user.username.split('_')[1])
@@ -55,11 +49,11 @@ def get_student_from_user(user):
         except (ValueError, IndexError):
             pass
 
-    # 方法5: 通过 profile 关联 (如果存在)
+    # 方法4: 通过 profile 关联 (如果存在)
     try:
         profile = getattr(user, 'profile', None)
         if profile and hasattr(profile, 'employee_no') and profile.employee_no:
-            student = Student.objects.filter(name=profile.employee_no).first()
+            student = Student.objects.filter(student_no=profile.employee_no).first()
             if student:
                 return student.id
     except:
