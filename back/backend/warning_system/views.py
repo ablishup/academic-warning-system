@@ -526,7 +526,7 @@ class StudentWarningSummaryView(APIView):
 
         # 获取学生范围：管理员看所有，辅导员看管理的班级
         if is_admin:
-            all_students = Student.objects.all().select_related('class_field')
+            all_students = Student.objects.all()
         else:
             # 获取辅导员管理的所有学生
             from classes.models import Class
@@ -545,7 +545,7 @@ class StudentWarningSummaryView(APIView):
                     }
                 })
 
-            all_students = Student.objects.filter(class_id__in=class_ids).select_related('class_field')
+            all_students = Student.objects.filter(class_id__in=class_ids)
 
         # 获取这些学生的所有预警记录
         student_ids = [s.id for s in all_students]

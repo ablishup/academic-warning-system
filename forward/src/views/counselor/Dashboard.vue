@@ -128,7 +128,7 @@
         </div>
       </template>
 
-      <el-table :data="recentWarnings" v-loading="loading" stripe>
+      <el-table :data="recentStudentWarnings" v-loading="loading" stripe>
         <el-table-column label="学生姓名" width="100">
           <template #default="{ row }">
             <div class="student-name">
@@ -144,26 +144,41 @@
             <span>{{ row.student?.student_no }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="课程" min-width="150">
+        <el-table-column label="预警课程数" width="100">
           <template #default="{ row }">
-            <span>{{ row.course?.name }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="risk_level" label="风险等级" width="100">
-          <template #default="{ row }">
-            <el-tag :type="getRiskTagType(row.risk_level)" effect="dark" size="small">
-              {{ getRiskLabel(row.risk_level) }}
+            <el-tag
+              :type="row.warnings?.length > 2 ? 'danger' : row.warnings?.length > 1 ? 'warning' : 'info'"
+              size="small"
+            >
+              {{ row.warnings?.length || 0 }} 门
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="composite_score" label="综合得分" width="100">
+        <el-table-column label="风险分布" min-width="120">
           <template #default="{ row }">
-            <span :class="getScoreClass(row.composite_score)">{{ row.composite_score }}</span>
+            <div class="risk-distribution">
+              <el-tag v-if="row.risk_count?.high > 0" type="danger" size="small" effect="dark" class="risk-tag">
+                高 {{ row.risk_count.high }}
+              </el-tag>
+              <el-tag v-if="row.risk_count?.medium > 0" type="warning" size="small" effect="dark" class="risk-tag">
+                中 {{ row.risk_count.medium }}
+              </el-tag>
+              <el-tag v-if="row.risk_count?.low > 0" type="info" size="small" effect="dark" class="risk-tag">
+                低 {{ row.risk_count.low }}
+              </el-tag>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column prop="calculation_time" label="预警时间" width="150">
+        <el-table-column label="最高风险" width="90">
           <template #default="{ row }">
-            {{ formatDate(row.calculation_time) }}
+            <el-tag :type="getRiskTagType(row.highest_risk)" effect="dark" size="small">
+              {{ getRiskLabel(row.highest_risk) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="平均得分" width="90">
+          <template #default="{ row }">
+            <span :class="getScoreClass(row.avg_score)">{{ row.avg_score ?? '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
@@ -180,7 +195,7 @@
     </el-card>
 
     <!-- 学生详情弹窗 -->
-    <el-dialog v-model="detailDialogVisible" title="学生学情详情" width="700px">
+    <el-dialog v-model="detailDialogVisible" title="学生学情详情" width="800px">
       <div v-if="selectedStudent" class="student-detail">
         <div class="detail-header">
           <el-avatar :size="64" :style="{ background: getAvatarColor(selectedStudent.student?.name) }">
@@ -190,28 +205,63 @@
             <h3>{{ selectedStudent.student?.name }}</h3>
             <p>学号：{{ selectedStudent.student?.student_no }} | 班级：{{ selectedStudent.student?.class_name || '-' }}</p>
           </div>
-          <el-tag :type="getRiskTagType(selectedStudent.risk_level)" effect="dark" size="large">
-            {{ getRiskLabel(selectedStudent.risk_level) }}
-          </el-tag>
+          <div class="detail-tags">
+            <el-tag :type="getRiskTagType(selectedStudent.highest_risk)" effect="dark" size="large">
+              {{ getRiskLabel(selectedStudent.highest_risk) }}
+            </el-tag>
+            <el-tag type="info" size="large">{{ selectedStudent.warnings?.length || 0 }} 门课程预警</el-tag>
+          </div>
         </div>
 
-        <el-descriptions :column="2" border class="detail-descriptions">
-          <el-descriptions-item label="课程">{{ selectedStudent.course?.name }}</el-descriptions-item>
-          <el-descriptions-item label="综合得分">{{ selectedStudent.composite_score }}</el-descriptions-item>
-          <el-descriptions-item label="出勤率">{{ selectedStudent.attendance_score }}%</el-descriptions-item>
-          <el-descriptions-item label="视频进度">{{ selectedStudent.progress_score }}%</el-descriptions-item>
-          <el-descriptions-item label="作业成绩">{{ selectedStudent.homework_score }}</el-descriptions-item>
-          <el-descriptions-item label="考试成绩">{{ selectedStudent.exam_score }}</el-descriptions-item>
-        </el-descriptions>
+        <h4 class="section-title">课程预警详情</h4>
+        <el-table :data="selectedStudent.warnings" size="small" border class="warning-table">
+          <el-table-column label="课程" min-width="150">
+            <template #default="{ row }">
+              <span>{{ row.course?.name }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="风险等级" width="90">
+            <template #default="{ row }">
+              <el-tag :type="getRiskTagType(row.risk_level)" effect="dark" size="small">
+                {{ getRiskLabel(row.risk_level) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="综合得分" width="90">
+            <template #default="{ row }">
+              <span :class="getScoreClass(row.composite_score)">{{ row.composite_score }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="出勤率" width="80">
+            <template #default="{ row }">
+              <span>{{ row.attendance_score }}%</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="视频进度" width="80">
+            <template #default="{ row }">
+              <span>{{ row.progress_score }}%</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="作业" width="70">
+            <template #default="{ row }">
+              <span>{{ row.homework_score }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="考试" width="70">
+            <template #default="{ row }">
+              <span>{{ row.exam_score }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
 
         <div class="detail-actions">
           <el-button type="primary" @click="addIntervention(selectedStudent)">
             <el-icon><FirstAidKit /></el-icon>
             添加干预记录
           </el-button>
-          <el-button v-if="selectedStudent.status === 'active'" type="success" @click="resolveWarning(selectedStudent)">
-            <el-icon><CircleCheck /></el-icon>
-            标记为已解决
+          <el-button type="success" @click="$router.push('/counselor/warnings')">
+            <el-icon><ArrowRight /></el-icon>
+            查看完整预警
           </el-button>
         </div>
       </div>
@@ -230,7 +280,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  getSchoolOverview, getWarningRecords, calculateWarnings as apiCalculateWarnings,
+  getSchoolOverview, getWarningRecordsByStudent, calculateWarnings as apiCalculateWarnings,
   syncStudentScores
 } from '@/api/counselor'
 
@@ -257,8 +307,8 @@ const stats = reactive({
 // 班级统计数据（用于图表）
 const classStats = ref([])
 
-// 最近预警学生
-const recentWarnings = ref([])
+// 最近预警学生（按学生汇总，只显示有预警的学生）
+const recentStudentWarnings = ref([])
 
 // 图表引用
 const pieChartRef = ref(null)
@@ -290,14 +340,14 @@ const loadData = async () => {
       stats.newInterventions = interventionStats?.this_month || 0
     }
 
-    // 获取最近预警学生（API已按辅导员过滤）
-    const warningsRes = await getWarningRecords({
-      status: 'active',
-      ordering: '-calculation_time',
-      page_size: 10
-    })
+    // 获取最近预警学生（按学生汇总，只显示有预警的学生）
+    const warningsRes = await getWarningRecordsByStudent()
     if (warningsRes.code === 200) {
-      recentWarnings.value = warningsRes.data?.results || warningsRes.data || []
+      // 过滤掉正常状态的学生，只显示有预警的学生，并限制为前10条
+      const studentsWithWarnings = (warningsRes.data?.students || [])
+        .filter(s => s.highest_risk !== 'normal')
+        .slice(0, 10)
+      recentStudentWarnings.value = studentsWithWarnings
     }
 
     // 更新图表
@@ -307,20 +357,53 @@ const loadData = async () => {
     console.error('加载数据失败:', error)
     ElMessage.error('加载数据失败')
     // 使用模拟数据
-    recentWarnings.value = getMockWarnings()
+    recentStudentWarnings.value = getMockStudentWarnings()
     updateCharts()
   } finally {
     loading.value = false
   }
 }
 
-// 模拟数据
-const getMockWarnings = () => [
-  { id: 1, student_name: '张三', student_no: '2021001', course_name: '数据结构', risk_level: 'high', composite_score: 45.5, attendance_score: 60, progress_score: 40, homework_score: 50, exam_score: 42, calculation_time: '2025-04-10', status: 'active' },
-  { id: 2, student_name: '李四', student_no: '2021002', course_name: '数据结构', risk_level: 'medium', composite_score: 65.2, attendance_score: 75, progress_score: 60, homework_score: 68, exam_score: 62, calculation_time: '2025-04-09', status: 'active' },
-  { id: 3, student_name: '王五', student_no: '2021003', course_name: '算法设计', risk_level: 'high', composite_score: 38.7, attendance_score: 55, progress_score: 35, homework_score: 40, exam_score: 38, calculation_time: '2025-04-09', status: 'active' },
-  { id: 4, student_name: '赵六', student_no: '2021004', course_name: '操作系统', risk_level: 'low', composite_score: 72.3, attendance_score: 80, progress_score: 75, homework_score: 70, exam_score: 68, calculation_time: '2025-04-08', status: 'active' },
-  { id: 5, student_name: '钱七', student_no: '2021005', course_name: '计算机网络', risk_level: 'medium', composite_score: 58.9, attendance_score: 70, progress_score: 55, homework_score: 60, exam_score: 52, calculation_time: '2025-04-08', status: 'active' }
+// 模拟数据（按学生汇总）
+const getMockStudentWarnings = () => [
+  {
+    student: { id: 1, name: '张三', student_no: '2021001' },
+    warnings: [
+      { id: 1, course: { name: '数据结构' }, risk_level: 'high', composite_score: 45.5 },
+      { id: 2, course: { name: '算法设计' }, risk_level: 'medium', composite_score: 62.3 }
+    ],
+    risk_count: { high: 1, medium: 1, low: 0 },
+    highest_risk: 'high',
+    avg_score: 53.9
+  },
+  {
+    student: { id: 2, name: '李四', student_no: '2021002' },
+    warnings: [
+      { id: 3, course: { name: '操作系统' }, risk_level: 'medium', composite_score: 65.2 }
+    ],
+    risk_count: { high: 0, medium: 1, low: 0 },
+    highest_risk: 'medium',
+    avg_score: 65.2
+  },
+  {
+    student: { id: 3, name: '王五', student_no: '2021003' },
+    warnings: [
+      { id: 4, course: { name: '计算机网络' }, risk_level: 'high', composite_score: 38.7 },
+      { id: 5, course: { name: '数据库原理' }, risk_level: 'high', composite_score: 42.1 }
+    ],
+    risk_count: { high: 2, medium: 0, low: 0 },
+    highest_risk: 'high',
+    avg_score: 40.4
+  },
+  {
+    student: { id: 4, name: '赵六', student_no: '2021004' },
+    warnings: [
+      { id: 6, course: { name: '编译原理' }, risk_level: 'low', composite_score: 72.3 }
+    ],
+    risk_count: { high: 0, medium: 0, low: 1 },
+    highest_risk: 'low',
+    avg_score: 72.3
+  }
 ]
 
 // 更新图表
@@ -433,9 +516,15 @@ const viewStudentDetail = (row) => {
 
 // 添加干预记录
 const addIntervention = (row) => {
+  // 找到最高风险的预警ID
+  const highestRiskWarning = row.warnings?.reduce((highest, current) => {
+    const riskOrder = { high: 3, medium: 2, low: 1, normal: 0 }
+    return riskOrder[current.risk_level] > riskOrder[highest.risk_level] ? current : highest
+  }, row.warnings?.[0])
+
   router.push({
     path: '/counselor/interventions',
-    query: { student_id: row.student?.id, warning_id: row.id }
+    query: { student_id: row.student?.id, warning_id: highestRiskWarning?.id }
   })
 }
 
@@ -654,5 +743,34 @@ onUnmounted(() => {
   justify-content: center;
   gap: 16px;
   margin-top: 24px;
+}
+
+/* 风险分布标签 */
+.risk-distribution {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.risk-tag {
+  font-size: 11px;
+}
+
+/* 详情弹窗样式 */
+.detail-tags {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.section-title {
+  margin: 20px 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.warning-table {
+  margin-bottom: 20px;
 }
 </style>
