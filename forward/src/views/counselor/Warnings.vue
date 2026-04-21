@@ -171,28 +171,28 @@
             <el-table-column label="风险分布" min-width="120">
               <template #default="{ row }">
                 <div class="risk-distribution">
-                  <el-tag v-if="row.riskCount.high > 0" type="danger" size="small" effect="dark" class="risk-tag">
-                    高 {{ row.riskCount.high }}
+                  <el-tag v-if="row.risk_count?.high > 0" type="danger" size="small" effect="dark" class="risk-tag">
+                    高 {{ row.risk_count.high }}
                   </el-tag>
-                  <el-tag v-if="row.riskCount.medium > 0" type="warning" size="small" effect="dark" class="risk-tag">
-                    中 {{ row.riskCount.medium }}
+                  <el-tag v-if="row.risk_count?.medium > 0" type="warning" size="small" effect="dark" class="risk-tag">
+                    中 {{ row.risk_count.medium }}
                   </el-tag>
-                  <el-tag v-if="row.riskCount.low > 0" type="info" size="small" effect="dark" class="risk-tag">
-                    低 {{ row.riskCount.low }}
+                  <el-tag v-if="row.risk_count?.low > 0" type="info" size="small" effect="dark" class="risk-tag">
+                    低 {{ row.risk_count.low }}
                   </el-tag>
                 </div>
               </template>
             </el-table-column>
             <el-table-column label="最高风险" width="80">
               <template #default="{ row }">
-                <el-tag :type="getRiskTagType(row.highestRisk)" size="small" effect="dark">
-                  {{ getRiskLabel(row.highestRisk) }}
+                <el-tag :type="getRiskTagType(row.highest_risk)" size="small" effect="dark">
+                  {{ getRiskLabel(row.highest_risk) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="平均得分" width="80" sortable :sort-method="(a, b) => a.avgScore - b.avgScore">
+            <el-table-column label="平均得分" width="80" sortable :sort-method="(a, b) => (a.avg_score || 0) - (b.avg_score || 0)">
               <template #default="{ row }">
-                <span :class="getScoreClass(row.avgScore)">{{ row.avgScore }}</span>
+                <span :class="getScoreClass(row.avg_score)">{{ row.avg_score ?? '-' }}</span>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="70" fixed="right">
@@ -369,8 +369,8 @@
               </div>
               <div class="info-item">
                 <span class="info-label">最高风险：</span>
-                <el-tag :type="getRiskTagType(selectedRow.highestRisk)" size="small" effect="dark">
-                  {{ getRiskLabel(selectedRow.highestRisk) }}
+                <el-tag :type="getRiskTagType(selectedRow.highest_risk)" size="small" effect="dark">
+                  {{ getRiskLabel(selectedRow.highest_risk) }}
                 </el-tag>
               </div>
               <el-divider />
@@ -518,7 +518,7 @@ import {
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import {
-  getWarningRecords, resolveWarning as apiResolveWarning, getWarningStats,
+  getWarningRecordsByStudent, resolveWarning as apiResolveWarning, getWarningStats,
   generateCounselorComment, getStoredComment, sendSMSNotification
 } from '@/api/counselor'
 
@@ -557,48 +557,11 @@ const pagination = reactive({
   total: 0
 })
 
-// 预警列表（原始数据）
+// 预警列表（原始数据，保留用于展开行显示）
 const warnings = ref([])
 
-// 按学生汇总的预警列表（全部）
-const allStudentWarnings = computed(() => {
-  const studentMap = new Map()
-
-  warnings.value.forEach(warning => {
-    const studentId = warning.student?.id
-    if (!studentId) return
-
-    if (!studentMap.has(studentId)) {
-      studentMap.set(studentId, {
-        student: warning.student,
-        warnings: [],
-        highestRisk: warning.risk_level,
-        avgScore: warning.composite_score,
-        riskCount: { high: 0, medium: 0, low: 0 }
-      })
-    }
-
-    const studentData = studentMap.get(studentId)
-    studentData.warnings.push(warning)
-
-    // 统计风险等级
-    if (warning.risk_level === 'high') studentData.riskCount.high++
-    else if (warning.risk_level === 'medium') studentData.riskCount.medium++
-    else if (warning.risk_level === 'low') studentData.riskCount.low++
-
-    // 更新最高风险等级
-    const riskOrder = { high: 3, medium: 2, low: 1, normal: 0 }
-    if (riskOrder[warning.risk_level] > riskOrder[studentData.highestRisk]) {
-      studentData.highestRisk = warning.risk_level
-    }
-
-    // 计算平均分
-    const totalScore = studentData.warnings.reduce((sum, w) => sum + (w.composite_score || 0), 0)
-    studentData.avgScore = (totalScore / studentData.warnings.length).toFixed(1)
-  })
-
-  return Array.from(studentMap.values())
-})
+// 按学生汇总的预警列表（来自后端API，已排序）
+const allStudentWarnings = ref([])
 
 // 分页后的学生预警列表
 const studentWarnings = computed(() => {
@@ -623,28 +586,33 @@ const smsForm = reactive({
   message: ''
 })
 
-// 加载预警列表数据
+// 加载预警列表数据（使用按学生汇总的API）
 const loadData = async () => {
   loading.value = true
   try {
-    const params = {
-      page: pagination.page,
-      page_size: pagination.pageSize,
-      ...filters
-    }
-    console.log('请求参数:', params)
-    const res = await getWarningRecords(params)
+    console.log('正在加载按学生汇总的预警数据...')
+    const res = await getWarningRecordsByStudent()
     console.log('API响应:', res)
     if (res.code === 200) {
-      warnings.value = res.data?.results || res.data || []
-      // 更新总数为分组后的学生数量
-      pagination.total = allStudentWarnings.value.length
-      console.log('预警数据:', warnings.value)
+      // 直接使用后端返回的按学生汇总数据（已按风险排序）
+      const studentList = res.data?.students || []
+      allStudentWarnings.value = studentList
+      warnings.value = studentList.flatMap(s => s.warnings || [])
+
+      // 更新分页总数
+      pagination.total = studentList.length
+      console.log('学生预警汇总数据:', studentList)
       console.log('总数:', pagination.total)
 
       // 如果有数据且未选择，默认选择第一条
-      if (allStudentWarnings.value.length > 0 && !selectedRow.value) {
-        handleStudentSelect(studentWarnings.value[0])
+      if (studentList.length > 0 && !selectedRow.value) {
+        // 等待响应式更新后再选择
+        setTimeout(() => {
+          const firstPage = studentWarnings.value
+          if (firstPage.length > 0) {
+            handleStudentSelect(firstPage[0])
+          }
+        }, 0)
       }
     } else {
       console.error('API返回错误:', res)
@@ -839,12 +807,12 @@ const exportData = () => {
     s.student?.name,
     s.student?.student_no,
     s.student?.class_name || '-',
-    s.warnings.length,
-    s.riskCount.high,
-    s.riskCount.medium,
-    s.riskCount.low,
-    getRiskLabel(s.highestRisk),
-    s.avgScore
+    s.warnings?.length || 0,
+    s.risk_count?.high || 0,
+    s.risk_count?.medium || 0,
+    s.risk_count?.low || 0,
+    getRiskLabel(s.highest_risk),
+    s.avg_score ?? '-'
   ])
 
   const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n')

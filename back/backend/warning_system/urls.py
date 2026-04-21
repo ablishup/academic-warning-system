@@ -19,4 +19,7 @@ urlpatterns = [
     # 数据同步
     path('sync-scores/', views.SyncStudentScoresView.as_view(), name='sync-scores'),
     path('sync-status/', views.SyncStatusView.as_view(), name='sync-status'),
+
+    # 按学生汇总的预警数据（辅导员专用）
+    path('by-student/', views.StudentWarningSummaryView.as_view(), name='warning-by-student'),
 ]

@@ -7,7 +7,18 @@ import request from './request'
 // ==================== 预警管理 ====================
 
 /**
- * 获取预警记录列表
+ * 获取预警记录列表（按学生汇总，辅导员专用）
+ * 返回按风险程度排序的所有管理学生（高危→中等→低危→正常）
+ */
+export function getWarningRecordsByStudent() {
+    return request({
+        url: '/warnings/by-student/',
+        method: 'get'
+    })
+}
+
+/**
+ * 获取预警记录列表（原始列表，保留用于兼容性）
  * @param {Object} params - 查询参数 {risk_level, status, student_id, course_id, search, ordering}
  */
 export function getWarningRecords(params = {}) {

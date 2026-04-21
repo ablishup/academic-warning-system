@@ -313,7 +313,9 @@ class WarningStatsView(APIView):
         queryset = WarningRecord.objects.all()
 
         # 根据用户角色过滤数据
-        if self._is_counselor(user):
+        is_admin = user.is_staff or user.is_superuser
+
+        if not is_admin and self._is_counselor(user):
             # 辅导员只能看到自己管理班级的学生预警
             counselor_student_ids = self._get_counselor_student_ids(user)
             if counselor_student_ids:
@@ -333,6 +335,7 @@ class WarningStatsView(APIView):
                         'resolved_count': 0
                     }
                 })
+        # 管理员可以看到所有预警（不做过滤）
 
         stats = queryset.aggregate(
             total_warnings=Count('id'),
@@ -490,5 +493,166 @@ class SyncStatusView(APIView):
             'data': {
                 'statistics': stats,
                 'recent_synced': recent_list
+            }
+        })
+
+
+class StudentWarningSummaryView(APIView):
+    """
+    获取按学生汇总的预警数据
+    返回辅导员管理的所有学生及其预警信息，按风险等级排序（高危→中等→低危→正常）
+    管理员可以查看所有学生
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # 检查是否是辅导员或管理员
+        is_counselor = False
+        is_admin = user.is_staff or user.is_superuser
+
+        if not is_admin:
+            if hasattr(user, 'counselor_profile') and user.counselor_profile:
+                is_counselor = True
+            elif hasattr(user, 'groups'):
+                is_counselor = user.groups.filter(name='counselor').exists()
+
+            if not is_counselor:
+                return Response({
+                    'code': 403,
+                    'message': '只有辅导员或管理员可以访问此接口'
+                }, status=status.HTTP_403_FORBIDDEN)
+
+        # 获取学生范围：管理员看所有，辅导员看管理的班级
+        if is_admin:
+            all_students = Student.objects.all().select_related('class_field')
+        else:
+            # 获取辅导员管理的所有学生
+            from classes.models import Class
+
+            managed_classes = Class.objects.filter(counselor_id=user.id)
+            class_ids = [c.id for c in managed_classes]
+
+            if not class_ids:
+                return Response({
+                    'code': 200,
+                    'message': '获取成功',
+                    'data': {
+                        'students': [],
+                        'total': 0,
+                        'risk_summary': {'high': 0, 'medium': 0, 'low': 0, 'normal': 0}
+                    }
+                })
+
+            all_students = Student.objects.filter(class_id__in=class_ids).select_related('class_field')
+
+        # 获取这些学生的所有预警记录
+        student_ids = [s.id for s in all_students]
+        warnings = WarningRecord.objects.filter(
+            student_id__in=student_ids
+        ).select_related('student', 'course')
+
+        # 按学生分组整理数据
+        student_warnings_map = {}
+        for warning in warnings:
+            sid = warning.student_id
+            if sid not in student_warnings_map:
+                student_warnings_map[sid] = []
+            student_warnings_map[sid].append(warning)
+
+        # 构建学生预警汇总列表
+        result = []
+        risk_summary = {'high': 0, 'medium': 0, 'low': 0, 'normal': 0}
+
+        for student in all_students:
+            student_warnings = student_warnings_map.get(student.id, [])
+
+            if student_warnings:
+                # 计算该学生的风险统计
+                risk_count = {'high': 0, 'medium': 0, 'low': 0}
+                highest_risk = 'low'
+                risk_order = {'high': 3, 'medium': 2, 'low': 1}
+                total_score = 0
+
+                for w in student_warnings:
+                    if w.risk_level in risk_count:
+                        risk_count[w.risk_level] += 1
+                    # 更新最高风险
+                    if risk_order.get(w.risk_level, 0) > risk_order.get(highest_risk, 0):
+                        highest_risk = w.risk_level
+                    total_score += float(w.composite_score or 0)
+
+                avg_score = total_score / len(student_warnings) if student_warnings else 0
+
+                # 统计风险分布
+                risk_summary[highest_risk] += 1
+
+                result.append({
+                    'student': {
+                        'id': student.id,
+                        'name': student.name,
+                        'student_no': student.student_no,
+                        'class_name': student.class_name if hasattr(student, 'class_name') else str(student.class_field) if hasattr(student, 'class_field') else None
+                    },
+                    'warnings': [
+                        {
+                            'id': w.id,
+                            'course': {
+                                'id': w.course.id if w.course else None,
+                                'name': w.course.name if w.course else '未知课程'
+                            },
+                            'risk_level': w.risk_level,
+                            'composite_score': float(w.composite_score) if w.composite_score else None,
+                            'attendance_score': float(w.attendance_score) if w.attendance_score else None,
+                            'progress_score': float(w.progress_score) if w.progress_score else None,
+                            'homework_score': float(w.homework_score) if w.homework_score else None,
+                            'exam_score': float(w.exam_score) if w.exam_score else None,
+                            'status': w.status,
+                            'calculation_time': w.calculation_time.isoformat() if w.calculation_time else None
+                        }
+                        for w in student_warnings
+                    ],
+                    'highest_risk': highest_risk,
+                    'risk_count': risk_count,
+                    'avg_score': round(avg_score, 2),
+                    'status': 'at_risk'
+                })
+            else:
+                # 正常学生（无预警）
+                risk_summary['normal'] += 1
+                result.append({
+                    'student': {
+                        'id': student.id,
+                        'name': student.name,
+                        'student_no': student.student_no,
+                        'class_name': student.class_name if hasattr(student, 'class_name') else str(student.class_field) if hasattr(student, 'class_field') else None
+                    },
+                    'warnings': [],
+                    'highest_risk': 'normal',
+                    'risk_count': {'high': 0, 'medium': 0, 'low': 0},
+                    'avg_score': None,
+                    'status': 'normal'
+                })
+
+        # 按风险等级排序：高危 > 中等 > 低危 > 正常
+        # 同风险等级按平均得分升序（分数低的在前）
+        risk_order = {'high': 3, 'medium': 2, 'low': 1, 'normal': 0}
+
+        def sort_key(item):
+            risk_val = risk_order.get(item['highest_risk'], 0)
+            # 平均得分越低越靠前，None放在最后
+            score = item['avg_score'] if item['avg_score'] is not None else 999
+            return (-risk_val, score)
+
+        result.sort(key=sort_key)
+
+        return Response({
+            'code': 200,
+            'message': '获取成功',
+            'data': {
+                'students': result,
+                'total': len(result),
+                'risk_summary': risk_summary
             }
         })
