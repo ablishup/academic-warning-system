@@ -73,6 +73,7 @@ class WarningRecordListView(generics.ListAPIView):
 
     def get_queryset(self):
         queryset = WarningRecord.objects.all()
+        user = self.request.user
 
         # 筛选参数
         risk_level = self.request.query_params.get('risk_level')
@@ -80,9 +81,27 @@ class WarningRecordListView(generics.ListAPIView):
         student_id = self.request.query_params.get('student_id')
         course_id = self.request.query_params.get('course_id')
 
-        # 如果没有提供student_id，尝试从当前用户推断
-        if not student_id:
-            student_id = get_student_from_user(self.request.user)
+        # 根据用户角色过滤数据
+        if hasattr(user, 'role'):
+            if user.role == 'student':
+                # 学生只能看到自己的预警
+                student_id = get_student_from_user(user)
+                if student_id:
+                    queryset = queryset.filter(student_id=student_id)
+            elif user.role == 'counselor':
+                # 辅导员只能看到自己管理班级的学生预警
+                counselor_student_ids = self._get_counselor_student_ids(user)
+                if counselor_student_ids:
+                    queryset = queryset.filter(student_id__in=counselor_student_ids)
+        elif user.is_staff or user.is_superuser:
+            # 管理员可以看到所有预警
+            pass
+        else:
+            # 如果没有角色信息，尝试从学生关联
+            if not student_id:
+                student_id = get_student_from_user(user)
+                if student_id:
+                    queryset = queryset.filter(student_id=student_id)
 
         if risk_level:
             queryset = queryset.filter(risk_level=risk_level)
@@ -94,6 +113,24 @@ class WarningRecordListView(generics.ListAPIView):
             queryset = queryset.filter(course_id=course_id)
 
         return queryset.select_related('student', 'course')
+
+    def _get_counselor_student_ids(self, user):
+        """获取辅导员管理班级的所有学生ID"""
+        from classes.models import Student, Class
+
+        # 获取辅导员的ID（在users表中的ID）
+        counselor_user_id = user.id
+
+        # 查找该辅导员管理的班级
+        managed_classes = Class.objects.filter(counselor_id=counselor_user_id)
+        class_ids = [c.id for c in managed_classes]
+
+        if not class_ids:
+            return []
+
+        # 获取这些班级的所有学生
+        students = Student.objects.filter(class_id__in=class_ids)
+        return [s.id for s in students]
 
 
 class WarningRecordDetailView(generics.RetrieveAPIView):
@@ -272,7 +309,32 @@ class WarningStatsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        stats = WarningRecord.objects.aggregate(
+        user = request.user
+        queryset = WarningRecord.objects.all()
+
+        # 根据用户角色过滤数据
+        if self._is_counselor(user):
+            # 辅导员只能看到自己管理班级的学生预警
+            counselor_student_ids = self._get_counselor_student_ids(user)
+            if counselor_student_ids:
+                queryset = queryset.filter(student_id__in=counselor_student_ids)
+            else:
+                # 如果没有管理班级，返回空统计
+                return Response({
+                    'code': 200,
+                    'message': '获取成功',
+                    'data': {
+                        'total_warnings': 0,
+                        'high_risk_count': 0,
+                        'medium_risk_count': 0,
+                        'low_risk_count': 0,
+                        'normal_count': 0,
+                        'active_count': 0,
+                        'resolved_count': 0
+                    }
+                })
+
+        stats = queryset.aggregate(
             total_warnings=Count('id'),
             high_risk_count=Count('id', filter=Q(risk_level='high')),
             medium_risk_count=Count('id', filter=Q(risk_level='medium')),
@@ -287,6 +349,34 @@ class WarningStatsView(APIView):
             'message': '获取成功',
             'data': stats
         })
+
+    def _is_counselor(self, user):
+        """检查用户是否是辅导员"""
+        # 方法1: 检查是否有counselor_profile属性
+        if hasattr(user, 'counselor_profile') and user.counselor_profile:
+            return True
+        # 方法2: 检查用户组
+        if hasattr(user, 'groups'):
+            return user.groups.filter(name='counselor').exists()
+        return False
+
+    def _get_counselor_student_ids(self, user):
+        """获取辅导员管理班级的所有学生ID"""
+        from classes.models import Student, Class
+
+        # 获取辅导员的ID（在users表中的ID）
+        counselor_user_id = user.id
+
+        # 查找该辅导员管理的班级
+        managed_classes = Class.objects.filter(counselor_id=counselor_user_id)
+        class_ids = [c.id for c in managed_classes]
+
+        if not class_ids:
+            return []
+
+        # 获取这些班级的所有学生
+        students = Student.objects.filter(class_id__in=class_ids)
+        return [s.id for s in students]
 
 
 class StudentCourseScoreListView(generics.ListAPIView):

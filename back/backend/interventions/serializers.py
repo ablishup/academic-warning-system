@@ -23,7 +23,8 @@ class InterventionRecordListSerializer(serializers.ModelSerializer):
             'intervention_type', 'type_display',
             'method', 'method_display',
             'title', 'content',
-            'intervention_time', 'created_at'
+            'intervention_time', 'created_at',
+            'counselor_name', 'effectiveness_display'
         ]
 
     def get_counselor_name(self, obj):

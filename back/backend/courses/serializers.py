@@ -49,15 +49,22 @@ class CourseResourceCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CourseResource
         fields = ['course', 'knowledge_point', 'name', 'file', 'resource_type', 'description']
+        # name 字段设为非必填，从文件名自动提取
+        extra_kwargs = {
+            'name': {'required': False, 'allow_blank': True}
+        }
 
     def validate(self, data):
-        """验证文件大小和类型"""
+        """验证文件大小和类型，自动提取文件名作为资源名称"""
         file = data.get('file')
         if file:
             # 限制文件大小为 500MB
             if file.size > 500 * 1024 * 1024:
                 raise serializers.ValidationError('文件大小不能超过500MB')
             data['file_size'] = file.size
+            # 如果没有提供名称，使用文件名作为资源名称
+            if not data.get('name'):
+                data['name'] = file.name
         return data
 
 

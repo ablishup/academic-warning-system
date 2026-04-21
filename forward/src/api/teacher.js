@@ -129,12 +129,13 @@ export function importExams(formData) {
 /**
  * 下载导入模板
  * @param {string} type - 模板类型 (activities/homework/exams/enrollments)
+ * @param {number} courseId - 课程ID（可选，提供后会生成带学生名单的模板）
  */
-export function getImportTemplate(type) {
+export function getImportTemplate(type, courseId = null) {
     return request({
         url: '/import/template/',
         method: 'get',
-        params: { type },
+        params: { type, course_id: courseId },
         responseType: 'blob'
     })
 }

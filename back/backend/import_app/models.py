@@ -27,11 +27,9 @@ class ImportLog(models.Model):
     )
     file_name = models.CharField(max_length=255, verbose_name='文件名')
     file_size = models.IntegerField(default=0, verbose_name='文件大小(字节)')
-    uploaded_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
+    uploaded_by = models.IntegerField(
         null=True,
-        verbose_name='上传者'
+        verbose_name='上传者ID'
     )
     course_id = models.IntegerField(null=True, blank=True, verbose_name='关联课程ID')
 

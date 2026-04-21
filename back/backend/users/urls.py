@@ -17,4 +17,13 @@ urlpatterns = [
     path('counselors/<int:pk>/', views.counselor_detail_view, name='counselor_detail'),
     path('profile/teacher/', views.teacher_profile_view, name='teacher_profile'),
     path('profile/counselor/', views.counselor_profile_view, name='counselor_profile'),
+    # 学生搜索接口
+    path('search/', views.search_students_view, name='search_students'),
+    # 辅导员班级管理接口
+    path('counselors/<int:pk>/classes/', views.counselor_classes_view, name='counselor_classes'),
+    path('counselors/<int:pk>/assign-classes/', views.assign_class_to_counselor_view, name='assign_class_to_counselor'),
+    path('counselors/<int:pk>/remove-class/', views.remove_class_from_counselor_view, name='remove_class_from_counselor'),
+    path('available-classes/', views.available_classes_view, name='available_classes'),
+    # 辅导员Dashboard统计
+    path('counselor/dashboard-stats/', views.counselor_dashboard_stats_view, name='counselor_dashboard_stats'),
 ]

@@ -189,22 +189,40 @@ export function getSyncStatus() {
 // ==================== 全校概览 ====================
 
 /**
- * 获取全校学情概览（整合多个API）
+ * 获取辅导员Dashboard统计数据
+ */
+export function getCounselorDashboardStats() {
+    return request({
+        url: '/auth/counselor/dashboard-stats/',
+        method: 'get'
+    })
+}
+
+/**
+ * 获取全校学情概览（整合多个API）- 辅导员版本（已过滤）
  */
 export async function getSchoolOverview() {
     try {
         // 并行获取多个统计数据
-        const [warningStatsRes, interventionStatsRes] = await Promise.all([
+        const [dashboardStatsRes, warningStatsRes, interventionStatsRes] = await Promise.all([
+            getCounselorDashboardStats().catch(() => ({ data: {} })),
             getWarningStats(),
             getInterventionStats().catch(() => ({ data: {} }))
         ])
 
         const warningStats = warningStatsRes.data || {}
+        const dashboardStats = dashboardStatsRes.data || {}
 
         return {
             code: 200,
             data: {
-                // 预警统计
+                // 辅导员管理的班级和学生统计
+                dashboardStats: {
+                    totalStudents: dashboardStats.total_students || 0,
+                    classCount: dashboardStats.class_count || 0,
+                    classes: dashboardStats.classes || []
+                },
+                // 预警统计（已按辅导员过滤）
                 warningStats: {
                     total: warningStats.total_warnings || 0,
                     high: warningStats.high_risk_count || 0,
@@ -213,7 +231,7 @@ export async function getSchoolOverview() {
                     active: warningStats.active_count || 0,
                     resolved: warningStats.resolved_count || 0
                 },
-                // 干预统计
+                // 干预统计（已按辅导员过滤）
                 interventionStats: interventionStatsRes.data || {}
             }
         }
@@ -240,6 +258,20 @@ export function getClassStats() {
     })
 }
 
+// ==================== 学生搜索 ====================
+
+/**
+ * 搜索学生（用于创建干预记录时选择学生）
+ * @param {string} keyword - 搜索关键词（学号或姓名，至少2个字符）
+ */
+export function searchStudents(keyword) {
+    return request({
+        url: '/auth/search/',
+        method: 'get',
+        params: { q: keyword }
+    })
+}
+
 // ==================== 学生详情 ====================
 
 /**
@@ -262,4 +294,42 @@ export async function getStudentDetail(student_id) {
         console.error('获取学生详情失败:', error)
         throw error
     }
+}
+
+// ==================== AI评语管理（新增）====================
+
+/**
+ * 生成辅导员AI评语
+ * @param {Object} data - { student_id, warning_id }
+ */
+export function generateCounselorComment(data) {
+    return request({
+        url: '/ai/counselor-comment/',
+        method: 'post',
+        data,
+        timeout: 60000  // 60秒超时，AI生成可能需要较长时间
+    })
+}
+
+/**
+ * 获取已存储的AI评语
+ * @param {number} warningId - 预警ID
+ */
+export function getStoredComment(warningId) {
+    return request({
+        url: `/ai/stored-comment/${warningId}/`,
+        method: 'get'
+    })
+}
+
+/**
+ * 发送短信通知
+ * @param {Object} data - { warning_id, phone, message }
+ */
+export function sendSMSNotification(data) {
+    return request({
+        url: '/ai/send-sms/',
+        method: 'post',
+        data
+    })
 }

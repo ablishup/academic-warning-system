@@ -90,7 +90,7 @@
 </template>
 
 <script setup>
-import { School, DataBoard, Warning, FirstAidKit, UserFilled, ArrowDown, OfficeBuilding } from '@element-plus/icons-vue'
+import { School, DataBoard, Warning, FirstAidKit, UserFilled, ArrowDown, OfficeBuilding, ChatDotRound } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { ref, onMounted } from 'vue'
 import { getCurrentCounselorProfile } from '@/api/admin'

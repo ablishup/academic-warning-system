@@ -129,18 +129,26 @@
       </template>
 
       <el-table :data="recentWarnings" v-loading="loading" stripe>
-        <el-table-column prop="student_name" label="学生姓名" width="100">
+        <el-table-column label="学生姓名" width="100">
           <template #default="{ row }">
             <div class="student-name">
-              <el-avatar :size="32" :style="{ background: getAvatarColor(row.student_name) }">
-                {{ row.student_name?.charAt(0) }}
+              <el-avatar :size="32" :style="{ background: getAvatarColor(row.student?.name) }">
+                {{ row.student?.name?.charAt(0) }}
               </el-avatar>
-              <span>{{ row.student_name }}</span>
+              <span>{{ row.student?.name }}</span>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="student_no" label="学号" width="120" />
-        <el-table-column prop="course_name" label="课程" min-width="150" />
+        <el-table-column label="学号" width="120">
+          <template #default="{ row }">
+            <span>{{ row.student?.student_no }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="课程" min-width="150">
+          <template #default="{ row }">
+            <span>{{ row.course?.name }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="risk_level" label="风险等级" width="100">
           <template #default="{ row }">
             <el-tag :type="getRiskTagType(row.risk_level)" effect="dark" size="small">
@@ -175,12 +183,12 @@
     <el-dialog v-model="detailDialogVisible" title="学生学情详情" width="700px">
       <div v-if="selectedStudent" class="student-detail">
         <div class="detail-header">
-          <el-avatar :size="64" :style="{ background: getAvatarColor(selectedStudent.student_name) }">
-            {{ selectedStudent.student_name?.charAt(0) }}
+          <el-avatar :size="64" :style="{ background: getAvatarColor(selectedStudent.student?.name) }">
+            {{ selectedStudent.student?.name?.charAt(0) }}
           </el-avatar>
           <div class="detail-info">
-            <h3>{{ selectedStudent.student_name }}</h3>
-            <p>学号：{{ selectedStudent.student_no }}</p>
+            <h3>{{ selectedStudent.student?.name }}</h3>
+            <p>学号：{{ selectedStudent.student?.student_no }} | 班级：{{ selectedStudent.student?.class_name || '-' }}</p>
           </div>
           <el-tag :type="getRiskTagType(selectedStudent.risk_level)" effect="dark" size="large">
             {{ getRiskLabel(selectedStudent.risk_level) }}
@@ -188,7 +196,7 @@
         </div>
 
         <el-descriptions :column="2" border class="detail-descriptions">
-          <el-descriptions-item label="课程">{{ selectedStudent.course_name }}</el-descriptions-item>
+          <el-descriptions-item label="课程">{{ selectedStudent.course?.name }}</el-descriptions-item>
           <el-descriptions-item label="综合得分">{{ selectedStudent.composite_score }}</el-descriptions-item>
           <el-descriptions-item label="出勤率">{{ selectedStudent.attendance_score }}%</el-descriptions-item>
           <el-descriptions-item label="视频进度">{{ selectedStudent.progress_score }}%</el-descriptions-item>
@@ -237,14 +245,17 @@ const selectedStudent = ref(null)
 
 // 统计数据
 const stats = reactive({
-  totalStudents: 256,
-  classCount: 5,
-  highRisk: 12,
-  mediumRisk: 28,
-  lowRisk: 45,
-  interventions: 156,
-  newInterventions: 12
+  totalStudents: 0,
+  classCount: 0,
+  highRisk: 0,
+  mediumRisk: 0,
+  lowRisk: 0,
+  interventions: 0,
+  newInterventions: 0
 })
+
+// 班级统计数据（用于图表）
+const classStats = ref([])
 
 // 最近预警学生
 const recentWarnings = ref([])
@@ -259,16 +270,27 @@ let barChart = null
 const loadData = async () => {
   loading.value = true
   try {
-    // 获取全校概览
+    // 获取全校概览（包含Dashboard统计、预警统计、干预统计）
     const overviewRes = await getSchoolOverview()
     if (overviewRes.code === 200) {
       const data = overviewRes.data
-      stats.highRisk = data.warningStats.high
-      stats.mediumRisk = data.warningStats.medium
-      stats.lowRisk = data.warningStats.low
+      // Dashboard统计（学生总数、班级数）
+      stats.totalStudents = data.dashboardStats?.totalStudents || 0
+      stats.classCount = data.dashboardStats?.classCount || 0
+      classStats.value = data.dashboardStats?.classes || []
+
+      // 预警统计
+      stats.highRisk = data.warningStats?.high || 0
+      stats.mediumRisk = data.warningStats?.medium || 0
+      stats.lowRisk = data.warningStats?.low || 0
+
+      // 干预统计
+      const interventionStats = data.interventionStats || {}
+      stats.interventions = interventionStats?.total || 0
+      stats.newInterventions = interventionStats?.this_month || 0
     }
 
-    // 获取最近预警学生
+    // 获取最近预警学生（API已按辅导员过滤）
     const warningsRes = await getWarningRecords({
       status: 'active',
       ordering: '-calculation_time',
@@ -307,6 +329,12 @@ const updateCharts = () => {
   if (pieChartRef.value) {
     if (pieChart) pieChart.dispose()
     pieChart = echarts.init(pieChartRef.value)
+
+    // 计算正常学生数（总学生数 - 各风险等级学生数）
+    // 注意：一个学生可能有多个课程的预警，所以这里显示的是预警记录数，而非学生数
+    const totalWarnings = stats.highRisk + stats.mediumRisk + stats.lowRisk
+    const normalCount = Math.max(0, stats.totalStudents - totalWarnings)
+
     pieChart.setOption({
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       legend: { bottom: '5%', left: 'center' },
@@ -318,28 +346,31 @@ const updateCharts = () => {
         label: { show: false },
         emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
         data: [
-          { value: stats.highRisk, name: '高危', itemStyle: { color: '#ef4444' } },
-          { value: stats.mediumRisk, name: '中等', itemStyle: { color: '#f59e0b' } },
-          { value: stats.lowRisk, name: '低危', itemStyle: { color: '#3b82f6' } },
-          { value: 171, name: '正常', itemStyle: { color: '#10b981' } }
+          { value: stats.highRisk || 0, name: '高危', itemStyle: { color: '#ef4444' } },
+          { value: stats.mediumRisk || 0, name: '中等', itemStyle: { color: '#f59e0b' } },
+          { value: stats.lowRisk || 0, name: '低危', itemStyle: { color: '#3b82f6' } },
+          { value: normalCount, name: '正常', itemStyle: { color: '#10b981' } }
         ]
       }]
     })
   }
 
   // 班级预警对比柱状图
-  if (barChartRef.value) {
+  if (barChartRef.value && classStats.value.length > 0) {
     if (barChart) barChart.dispose()
     barChart = echarts.init(barChartRef.value)
+
+    // 使用真实的班级数据
+    const classNames = classStats.value.map(c => c.name)
+    const studentCounts = classStats.value.map(c => c.student_count || 0)
+
     barChart.setOption({
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-      xAxis: { type: 'category', data: ['计算机2101', '计算机2102', '软件2101', '软件2102', '网络2101'], axisLabel: { rotate: 15 } },
-      yAxis: { type: 'value' },
+      xAxis: { type: 'category', data: classNames, axisLabel: { rotate: 15 } },
+      yAxis: { type: 'value', name: '学生数' },
       series: [
-        { name: '高危', type: 'bar', stack: 'total', data: [3, 2, 4, 2, 1], itemStyle: { color: '#ef4444' } },
-        { name: '中等', type: 'bar', stack: 'total', data: [5, 3, 6, 4, 2], itemStyle: { color: '#f59e0b' } },
-        { name: '低危', type: 'bar', stack: 'total', data: [8, 6, 10, 5, 4], itemStyle: { color: '#3b82f6' } }
+        { name: '学生数', type: 'bar', data: studentCounts, itemStyle: { color: '#3b82f6', borderRadius: [4, 4, 0, 0] } }
       ]
     })
   }
@@ -404,7 +435,7 @@ const viewStudentDetail = (row) => {
 const addIntervention = (row) => {
   router.push({
     path: '/counselor/interventions',
-    query: { student_id: row.student_id, warning_id: row.id }
+    query: { student_id: row.student?.id, warning_id: row.id }
   })
 }
 

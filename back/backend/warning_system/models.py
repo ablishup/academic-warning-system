@@ -47,6 +47,22 @@ class WarningRecord(models.Model):
     ai_source = models.CharField(max_length=10, choices=AI_SOURCE_CHOICES, default='template',
                                  verbose_name='建议来源')
 
+    # 新增：辅导员评语相关字段
+    ai_generated_at = models.DateTimeField(null=True, blank=True, verbose_name='AI评语生成时间')
+    ai_generated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                        db_column='ai_generated_by',
+                                        related_name='generated_ai_comments',
+                                        verbose_name='AI评语生成者')
+
+    # 辅导员评语（干预建议）
+    counselor_comment = models.TextField(null=True, blank=True, verbose_name='辅导员评语')
+    counselor_suggestions = models.JSONField(null=True, blank=True, verbose_name='辅导员建议列表')
+    counselor_talk_script = models.TextField(null=True, blank=True, verbose_name='沟通话术建议')
+
+    # 短信通知状态
+    sms_sent = models.BooleanField(default=False, verbose_name='短信已发送')
+    sms_sent_at = models.DateTimeField(null=True, blank=True, verbose_name='短信发送时间')
+
     # 状态
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active', verbose_name='预警状态')
     resolved_at = models.DateTimeField(null=True, blank=True, verbose_name='解决时间')

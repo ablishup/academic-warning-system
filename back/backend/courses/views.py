@@ -41,7 +41,13 @@ class CourseResourceListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         """创建时设置上传者"""
-        serializer.save(created_by=self.request.user)
+        # 查找users表中对应的用户ID（外键约束引用users表而非auth_user）
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT id FROM users WHERE username = %s', [self.request.user.username])
+            result = cursor.fetchone()
+            user_id_in_users = result[0] if result else None
+        serializer.save(created_by_id=user_id_in_users)
 
     def list(self, request, *args, **kwargs):
         """列表响应包装"""

@@ -343,26 +343,13 @@ const loadResources = async () => {
       total.value = res.data.count || resources.value.length
     }
   } catch (error) {
+    console.error('加载资源列表失败:', error)
     ElMessage.error('加载资源列表失败')
-    // 使用模拟数据
-    resources.value = getMockResources()
+    resources.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
-}
-
-const getMockResources = () => {
-  const mockData = [
-    { id: 1, name: '第一章：绪论讲解视频.mp4', resource_type: 'video', file_size: 1024 * 1024 * 50, download_count: 128, created_at: '2025-04-08', course: 1 },
-    { id: 2, name: '课程大纲与教学计划.pdf', resource_type: 'document', file_size: 1024 * 512, download_count: 256, created_at: '2025-04-07', course: 1 },
-    { id: 3, name: '第二章：核心概念课件.pptx', resource_type: 'ppt', file_size: 1024 * 1024 * 5, download_count: 89, created_at: '2025-04-06', course: 1 },
-    { id: 4, name: '第一次作业习题集.docx', resource_type: 'exercise', file_size: 1024 * 256, download_count: 167, created_at: '2025-04-05', course: 1 },
-    { id: 5, name: '实验指导手册.pdf', resource_type: 'document', file_size: 1024 * 1024 * 2, download_count: 98, created_at: '2025-04-04', course: 1 },
-    { id: 6, name: '复习重点讲解视频.mp4', resource_type: 'video', file_size: 1024 * 1024 * 80, download_count: 234, created_at: '2025-04-03', course: 1 },
-  ]
-  return selectedCourse.value
-    ? mockData.filter(r => r.course === selectedCourse.value)
-    : mockData
 }
 
 const handleCourseChange = () => {

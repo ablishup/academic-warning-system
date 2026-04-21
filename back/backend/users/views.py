@@ -11,6 +11,8 @@ from .serializers import (
     UpdateUserSerializer, ResetPasswordSerializer,
     TeacherSerializer, CounselorSerializer
 )
+from classes.models import Student
+from classes.serializers import StudentListSerializer
 
 
 @api_view(['POST'])
@@ -354,3 +356,222 @@ def counselor_detail_view(request, pk):
             'code': 404,
             'message': '辅导员不存在'
         }, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def search_students_view(request):
+    """搜索学生（用于干预记录创建时选择学生）
+
+    支持按学号或姓名搜索，返回前10条结果
+    """
+    q = request.query_params.get('q', '')
+
+    if len(q) < 2:
+        return Response({
+            'code': 400,
+            'message': '搜索关键词至少需要2个字符'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # 按学号或姓名搜索
+    students = Student.objects.filter(
+        Q(student_no__icontains=q) | Q(name__icontains=q)
+    )[:10]
+
+    serializer = StudentListSerializer(students, many=True)
+    return Response({
+        'code': 200,
+        'message': '搜索成功',
+        'data': serializer.data
+    })
+
+
+# ==================== 辅导员班级管理 ====================
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def counselor_classes_view(request, pk):
+    """获取辅导员管理的班级列表"""
+    try:
+        counselor = Counselor.objects.get(pk=pk)
+        from classes.models import Class
+        classes = Class.objects.filter(counselor_id=counselor.user_id)
+
+        data = []
+        for cls in classes:
+            data.append({
+                'id': cls.id,
+                'name': cls.name,
+                'grade': cls.grade,
+                'student_count': cls.student_count,
+                'major_name': None  # 简化处理，不从major_id查询
+            })
+
+        return Response({
+            'code': 200,
+            'data': data
+        })
+    except Counselor.DoesNotExist:
+        return Response({
+            'code': 404,
+            'message': '辅导员不存在'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def assign_class_to_counselor_view(request, pk):
+    """为辅导员分配班级"""
+    try:
+        counselor = Counselor.objects.get(pk=pk)
+        class_ids = request.data.get('class_ids', [])
+
+        if not class_ids:
+            return Response({
+                'code': 400,
+                'message': '请选择要分配的班级'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        from classes.models import Class
+        assigned_count = 0
+        for class_id in class_ids:
+            try:
+                cls = Class.objects.get(id=class_id)
+                # 检查班级是否已被其他辅导员管理
+                if cls.counselor_id and cls.counselor_id != counselor.user_id:
+                    continue
+                cls.counselor_id = counselor.user_id
+                cls.save()
+                assigned_count += 1
+            except Class.DoesNotExist:
+                continue
+
+        return Response({
+            'code': 200,
+            'message': f'成功分配 {assigned_count} 个班级',
+            'data': {'assigned_count': assigned_count}
+        })
+    except Counselor.DoesNotExist:
+        return Response({
+            'code': 404,
+            'message': '辅导员不存在'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def remove_class_from_counselor_view(request, pk):
+    """解除辅导员与班级的关联"""
+    try:
+        counselor = Counselor.objects.get(pk=pk)
+        class_id = request.data.get('class_id')
+
+        if not class_id:
+            return Response({
+                'code': 400,
+                'message': '请指定要解除的班级'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        from classes.models import Class
+        try:
+            cls = Class.objects.get(id=class_id, counselor_id=counselor.user_id)
+            cls.counselor_id = None
+            cls.save()
+            return Response({
+                'code': 200,
+                'message': '解除关联成功'
+            })
+        except Class.DoesNotExist:
+            return Response({
+                'code': 404,
+                'message': '班级不存在或不属于该辅导员'
+            }, status=status.HTTP_404_NOT_FOUND)
+    except Counselor.DoesNotExist:
+        return Response({
+            'code': 404,
+            'message': '辅导员不存在'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def available_classes_view(request):
+    """获取可分配的班级列表（未被管理的班级）"""
+    from classes.models import Class
+    # 获取所有未被管理的班级
+    classes = Class.objects.filter(counselor_id__isnull=True)
+
+    data = []
+    for cls in classes:
+        data.append({
+            'id': cls.id,
+            'name': cls.name,
+            'grade': cls.grade,
+            'student_count': cls.student_count
+        })
+
+    return Response({
+        'code': 200,
+        'data': data
+    })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def counselor_dashboard_stats_view(request):
+    """获取辅导员Dashboard统计数据
+
+    返回当前登录辅导员管理的班级和学生统计
+    """
+    user = request.user
+
+    # 检查是否是辅导员
+    is_counselor = False
+    if hasattr(user, 'counselor_profile') and user.counselor_profile:
+        is_counselor = True
+    elif hasattr(user, 'groups'):
+        is_counselor = user.groups.filter(name='counselor').exists()
+
+    if not is_counselor:
+        return Response({
+            'code': 403,
+            'message': '只有辅导员可以访问此接口'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    from classes.models import Class, Student
+
+    # 获取辅导员管理的班级
+    managed_classes = Class.objects.filter(counselor_id=user.id)
+    class_ids = [c.id for c in managed_classes]
+
+    # 统计班级信息
+    class_stats = []
+    total_students = 0
+    for cls in managed_classes:
+        # 统计该班级的学生数
+        student_count = Student.objects.filter(class_id=cls.id).count()
+        class_stats.append({
+            'id': cls.id,
+            'name': cls.name,
+            'grade': cls.grade,
+            'student_count': student_count
+        })
+        total_students += student_count
+
+    # 获取管理的学生ID列表
+    student_ids = []
+    if class_ids:
+        student_ids = list(Student.objects.filter(
+            class_id__in=class_ids
+        ).values_list('id', flat=True))
+
+    return Response({
+        'code': 200,
+        'message': '获取成功',
+        'data': {
+            'total_students': total_students,
+            'class_count': len(class_ids),
+            'classes': class_stats,
+            'student_ids': student_ids
+        }
+    })

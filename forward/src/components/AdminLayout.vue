@@ -21,6 +21,10 @@
           <el-icon><User /></el-icon>
           <span>用户管理</span>
         </el-menu-item>
+        <el-menu-item index="/admin/counselors">
+          <el-icon><FirstAidKit /></el-icon>
+          <span>辅导员管理</span>
+        </el-menu-item>
         <el-menu-item index="/admin/courses">
           <el-icon><Reading /></el-icon>
           <span>课程管理</span>
@@ -63,7 +67,7 @@
 </template>
 
 <script setup>
-import { Setting, DataBoard, User, Reading, School, Tools, UserFilled, ArrowDown } from '@element-plus/icons-vue'
+import { Setting, DataBoard, User, Reading, School, Tools, UserFilled, ArrowDown, FirstAidKit } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()

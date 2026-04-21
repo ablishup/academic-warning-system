@@ -165,7 +165,10 @@ const viewStudents = (course) => {
 }
 
 const uploadData = (course) => {
-  router.push('/teacher/upload')
+  router.push({
+    path: '/teacher/upload',
+    query: { course_id: course.id }
+  })
 }
 
 onMounted(() => {

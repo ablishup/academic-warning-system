@@ -9,6 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.http import HttpResponse
 
 from classes.models import Student
 from courses.models import Course
@@ -25,6 +26,8 @@ class ImportTemplateDownloadView(APIView):
 
     def get(self, request):
         import_type = request.query_params.get('type')
+        course_id = request.query_params.get('course_id')
+
         if not import_type:
             return Response({
                 'code': 400,
@@ -58,7 +61,118 @@ class ImportTemplateDownloadView(APIView):
 
         template = templates[import_type]
 
-        # 创建示例数据
+        # 如果提供了course_id，获取该课程的学生列表
+        if course_id:
+            try:
+                from courses.models import CourseEnrollment
+                from classes.models import Student
+
+                # 获取课程学生
+                enrollments = CourseEnrollment.objects.filter(course_id=course_id)
+                student_ids = [e.student_id for e in enrollments]
+                students = Student.objects.filter(id__in=student_ids).order_by('student_no')
+
+                # 根据模板类型生成数据，确保字符串正确编码
+                def safe_str(val):
+                    if val is None:
+                        return ''
+                    if isinstance(val, bytes):
+                        return val.decode('utf-8', errors='ignore')
+                    return str(val)
+
+                if import_type == 'activities':
+                    sample_data = [
+                        [safe_str(s.student_no), safe_str(s.name), '', '', '', '', '', '']
+                        for s in students
+                    ]
+                elif import_type == 'homework':
+                    sample_data = [
+                        [safe_str(s.student_no), safe_str(s.name), '', '', '', '']
+                        for s in students
+                    ]
+                elif import_type == 'exams':
+                    sample_data = [
+                        [safe_str(s.student_no), safe_str(s.name), '', '', '']
+                        for s in students
+                    ]
+                else:
+                    sample_data = [
+                        [safe_str(s.student_no), safe_str(s.name), '', '']
+                        for s in students
+                    ]
+
+                # 更新文件名包含课程信息
+                from courses.models import Course
+                try:
+                    course = Course.objects.get(id=course_id)
+                    template['filename'] = f"{course.name}_{template['filename']}"
+                except Course.DoesNotExist:
+                    pass
+
+            except Exception as e:
+                # 如果出错，使用默认示例数据
+                sample_data = self._get_default_sample_data(import_type)
+        else:
+            # 使用默认示例数据
+            sample_data = self._get_default_sample_data(import_type)
+
+        # 创建Excel文件
+        output = io.BytesIO()
+        df = pd.DataFrame(sample_data, columns=template['columns'])
+
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='数据', index=False)
+
+            # 添加说明sheet
+            if import_type == 'activities':
+                instructions = pd.DataFrame({
+                    '说明': [
+                        '活动类型可选值: video(视频), sign_in(签到), discuss(讨论), quiz(测验)',
+                        '时长单位为秒',
+                        '进度为0-100的百分比数字',
+                        '日期格式: 2024-03-15',
+                        '学号和姓名已预填充，请勿修改'
+                    ]
+                })
+            elif import_type == 'homework':
+                instructions = pd.DataFrame({
+                    '说明': [
+                        '作业标题需与系统中创建的作业一致',
+                        '得分范围为0-100',
+                        '提交时间格式: 2024-03-10 10:30:00',
+                        '是否迟交填写: 是 或 否',
+                        '学号和姓名已预填充，请勿修改'
+                    ]
+                })
+            elif import_type == 'exams':
+                instructions = pd.DataFrame({
+                    '说明': [
+                        '考试标题需与系统中创建的考试一致',
+                        '得分范围为0-100',
+                        '提交时间格式: 2024-04-01 14:00:00',
+                        '学号和姓名已预填充，请勿修改'
+                    ]
+                })
+            else:
+                instructions = pd.DataFrame({'说明': ['请填写学号、姓名、课程编号和课程名称']})
+
+            instructions.to_excel(writer, sheet_name='填写说明', index=False)
+
+        output.seek(0)
+
+        # 使用Django的HttpResponse而不是DRF的Response，以正确处理二进制文件数据
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        # 正确处理中文文件名编码 (RFC 5987)
+        from urllib.parse import quote
+        filename = template["filename"]
+        response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
+        return response
+
+    def _get_default_sample_data(self, import_type):
+        """获取默认示例数据"""
         sample_data = {
             'activities': [
                 ['2021001', '张三', 'video', '第一章视频', '1800', '85.5', '', '2024-03-15'],
@@ -77,22 +191,7 @@ class ImportTemplateDownloadView(APIView):
                 ['2021002', '李四', 'CS101', '数据结构'],
             ]
         }
-
-        # 创建Excel文件
-        output = io.BytesIO()
-        df = pd.DataFrame(sample_data.get(import_type, []), columns=template['columns'])
-
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='数据', index=False)
-
-        output.seek(0)
-
-        response = Response(
-            output.getvalue(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename="{template["filename"]}"'
-        return response
+        return sample_data.get(import_type, [])
 
 
 class BaseImportView(APIView):
@@ -134,11 +233,18 @@ class BaseImportView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
         # 创建导入记录
+        # 查找users表中对应的用户ID（外键约束引用users表而非auth_user）
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT id FROM users WHERE username = %s', [request.user.username])
+            result = cursor.fetchone()
+            user_id_in_users = result[0] if result else None
+
         import_log = ImportLog.objects.create(
             import_type=self.import_type,
             file_name=file_obj.name,
             file_size=file_obj.size,
-            uploaded_by=request.user,
+            uploaded_by=user_id_in_users,
             course_id=course_id,
             status='pending'
         )
@@ -508,7 +614,7 @@ class ImportLogListView(generics.ListAPIView):
         if course_id:
             queryset = queryset.filter(course_id=course_id)
 
-        return queryset.select_related('uploaded_by')
+        return queryset
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -525,7 +631,7 @@ class ImportLogListView(generics.ListAPIView):
                 'failed_rows': log.failed_rows,
                 'status': log.status,
                 'status_display': log.get_status_display(),
-                'uploaded_by': log.uploaded_by.username if log.uploaded_by else None,
+                'uploaded_by': log.uploaded_by,
                 'created_at': log.created_at,
             })
 

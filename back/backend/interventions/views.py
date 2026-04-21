@@ -26,6 +26,7 @@ class InterventionRecordListView(generics.ListAPIView):
 
     def get_queryset(self):
         queryset = InterventionRecord.objects.all()
+        user = self.request.user
 
         # 筛选参数
         student_id = self.request.query_params.get('student_id')
@@ -33,6 +34,16 @@ class InterventionRecordListView(generics.ListAPIView):
         intervention_type = self.request.query_params.get('type')
         is_effective = self.request.query_params.get('is_effective')
         follow_up_needed = self.request.query_params.get('follow_up_needed')
+
+        # 根据用户角色过滤数据
+        if self._is_counselor(user):
+            # 辅导员只能看到自己管理班级的学生干预记录
+            counselor_student_ids = self._get_counselor_student_ids(user)
+            if counselor_student_ids:
+                queryset = queryset.filter(student_id__in=counselor_student_ids)
+            else:
+                # 如果没有管理班级，返回空结果
+                queryset = queryset.none()
 
         if student_id:
             queryset = queryset.filter(student_id=student_id)
@@ -49,6 +60,28 @@ class InterventionRecordListView(generics.ListAPIView):
             queryset = queryset.filter(follow_up_needed=follow_up_needed)
 
         return queryset.select_related('student', 'course', 'intervenor')
+
+    def _is_counselor(self, user):
+        """检查用户是否是辅导员"""
+        if hasattr(user, 'counselor_profile') and user.counselor_profile:
+            return True
+        if hasattr(user, 'groups'):
+            return user.groups.filter(name='counselor').exists()
+        return False
+
+    def _get_counselor_student_ids(self, user):
+        """获取辅导员管理班级的所有学生ID"""
+        from classes.models import Student, Class
+
+        counselor_user_id = user.id
+        managed_classes = Class.objects.filter(counselor_id=counselor_user_id)
+        class_ids = [c.id for c in managed_classes]
+
+        if not class_ids:
+            return []
+
+        students = Student.objects.filter(class_id__in=class_ids)
+        return [s.id for s in students]
 
 
 class InterventionRecordDetailView(generics.RetrieveAPIView):
@@ -70,7 +103,13 @@ class InterventionRecordCreateView(generics.CreateAPIView):
     queryset = InterventionRecord.objects.all()
 
     def perform_create(self, serializer):
-        serializer.save(intervenor=self.request.user)
+        # 查找users表中对应的用户ID（外键约束引用users表而非auth_user）
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT id FROM users WHERE username = %s', [self.request.user.username])
+            result = cursor.fetchone()
+            user_id_in_users = result[0] if result else None
+        serializer.save(intervenor_id=user_id_in_users)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -173,8 +212,30 @@ class InterventionStatsView(APIView):
 
     def get(self, request):
         student_id = request.query_params.get('student_id')
+        user = request.user
 
         queryset = InterventionRecord.objects.all()
+
+        # 根据用户角色过滤数据
+        if self._is_counselor(user):
+            # 辅导员只能看到自己管理班级的学生干预记录
+            counselor_student_ids = self._get_counselor_student_ids(user)
+            if counselor_student_ids:
+                queryset = queryset.filter(student_id__in=counselor_student_ids)
+            else:
+                # 如果没有管理班级，返回空统计
+                return Response({
+                    'code': 200,
+                    'message': '获取成功',
+                    'data': {
+                        'total': 0,
+                        'completed': 0,
+                        'by_type': {'talk': 0, 'academic': 0, 'psychological': 0, 'family': 0, 'other': 0},
+                        'by_effectiveness': {'effective': 0, 'ineffective': 0, 'pending': 0},
+                        'this_month': 0
+                    }
+                })
+
         if student_id:
             queryset = queryset.filter(student_id=student_id)
 
@@ -223,6 +284,28 @@ class InterventionStatsView(APIView):
                 'this_month': this_month
             }
         })
+
+    def _is_counselor(self, user):
+        """检查用户是否是辅导员"""
+        if hasattr(user, 'counselor_profile') and user.counselor_profile:
+            return True
+        if hasattr(user, 'groups'):
+            return user.groups.filter(name='counselor').exists()
+        return False
+
+    def _get_counselor_student_ids(self, user):
+        """获取辅导员管理班级的所有学生ID"""
+        from classes.models import Student, Class
+
+        counselor_user_id = user.id
+        managed_classes = Class.objects.filter(counselor_id=counselor_user_id)
+        class_ids = [c.id for c in managed_classes]
+
+        if not class_ids:
+            return []
+
+        students = Student.objects.filter(class_id__in=class_ids)
+        return [s.id for s in students]
 
 
 class StudentInterventionSummaryView(APIView):

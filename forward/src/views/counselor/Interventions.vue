@@ -367,15 +367,20 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Plus, FirstAidKit, CircleCheck, Timer, Search
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
   getInterventionRecords, createIntervention, updateIntervention,
-  getInterventionStats, getWarningRecords
+  getInterventionStats, getWarningRecords, searchStudents as searchStudentsApi
 } from '@/api/counselor'
+
+// 路由
+const router = useRouter()
+const route = useRoute()
 
 // 状态
 const loading = ref(false)
@@ -473,75 +478,13 @@ const loadData = async () => {
   } catch (error) {
     console.error('加载数据失败:', error)
     ElMessage.error('加载数据失败')
-    // 使用模拟数据
-    interventions.value = getMockInterventions()
+    interventions.value = []
+    pagination.total = 0
   } finally {
     loading.value = false
   }
 }
 
-// 模拟数据
-const getMockInterventions = () => [
-  {
-    id: 1,
-    student_name: '张三',
-    student_no: '2021001',
-    intervention_type: 'talk',
-    content: '与学生进行一对一谈话，了解学习困难原因，学生反映近期家庭有变故影响学习状态。已建议学生寻求心理咨询支持。',
-    intervention_time: '2025-04-10T14:30:00',
-    is_effective: true,
-    follow_up_plan: '两周后复查学习状态',
-    evaluation_note: '学生后续学习积极性有所提升'
-  },
-  {
-    id: 2,
-    student_name: '李四',
-    student_no: '2021002',
-    intervention_type: 'academic',
-    content: '安排学业帮扶，指派优秀学生进行课后辅导，重点帮助数据结构课程。',
-    intervention_time: '2025-04-09T10:00:00',
-    is_effective: null,
-    follow_up_plan: '持续关注作业完成情况'
-  },
-  {
-    id: 3,
-    student_name: '王五',
-    student_no: '2021003',
-    intervention_type: 'family',
-    content: '与学生家长电话沟通，告知学生在校学习情况，建议家长关注学生学习状态，配合学校督促学生按时上课。',
-    intervention_time: '2025-04-08T16:00:00',
-    is_effective: false,
-    evaluation_note: '家长反馈无力管教，效果不明显'
-  },
-  {
-    id: 4,
-    student_name: '赵六',
-    student_no: '2021004',
-    intervention_type: 'psychological',
-    content: '转介学校心理咨询中心，专业心理咨询师介入。',
-    intervention_time: '2025-04-07T09:30:00',
-    is_effective: true,
-    evaluation_note: '学生情绪状态明显改善'
-  },
-  {
-    id: 5,
-    student_name: '钱七',
-    student_no: '2021005',
-    intervention_type: 'other',
-    content: '协调任课教师，适当调整作业提交截止日期，给予学生缓冲时间。',
-    intervention_time: '2025-04-06T11:00:00',
-    is_effective: true
-  },
-  {
-    id: 6,
-    student_name: '孙八',
-    student_no: '2021006',
-    intervention_type: 'talk',
-    content: '了解学生缺课原因，学生表示对课程不感兴趣，已进行思想教育。',
-    intervention_time: '2025-04-05T15:00:00',
-    is_effective: null
-  }
-]
 
 // 筛选
 const handleFilter = () => {
@@ -590,23 +533,74 @@ const openAddDialog = async () => {
   addDialogVisible.value = true
 }
 
+// 带学生信息打开新增弹窗（从预警页面跳转过来）
+const openAddDialogWithStudent = async (studentId, warningId = null) => {
+  // 重置表单
+  addForm.student_id = studentId
+  addForm.warning_id = warningId
+  addForm.intervention_type = ''
+  addForm.intervention_time = new Date()
+  addForm.content = ''
+  addForm.follow_up_plan = ''
+
+  // 加载预警选项
+  try {
+    const res = await getWarningRecords({ status: 'active', page_size: 100 })
+    if (res.code === 200) {
+      warningOptions.value = res.data?.results || res.data || []
+    }
+  } catch (error) {
+    console.error('加载预警列表失败:', error)
+  }
+
+  // 加载学生信息并填充到选项中
+  if (studentId) {
+    studentLoading.value = true
+    try {
+      const res = await searchStudentsApi(studentId.toString())
+      if (res.code === 200) {
+        const students = res.data || []
+        studentOptions.value = students.map(s => ({
+          id: s.id,
+          name: s.name,
+          student_no: s.student_no
+        }))
+      }
+    } catch (error) {
+      console.error('加载学生信息失败:', error)
+    } finally {
+      studentLoading.value = false
+    }
+  }
+
+  addDialogVisible.value = true
+
+  // 清除URL参数
+  router.replace({ path: '/counselor/interventions', query: {} })
+}
+
 // 搜索学生
 const searchStudents = async (query) => {
   if (query.length < 2) return
   studentLoading.value = true
   try {
-    // 实际应该调用搜索学生API
-    // const res = await searchStudents(query)
-    // studentOptions.value = res.data || []
-
-    // 模拟数据
-    studentOptions.value = [
-      { id: 1, name: '张三', student_no: '2021001' },
-      { id: 2, name: '李四', student_no: '2021002' },
-      { id: 3, name: '王五', student_no: '2021003' },
-      { id: 4, name: '赵六', student_no: '2021004' },
-      { id: 5, name: '钱七', student_no: '2021005' }
-    ].filter(s => s.name.includes(query) || s.student_no.includes(query))
+    const res = await searchStudentsApi(query)
+    if (res.code === 200) {
+      // 后端返回的数据格式: [{ id, student_no, name, class_id }]
+      // 转换为前端需要的格式
+      studentOptions.value = (res.data || []).map(s => ({
+        id: s.id,
+        name: s.name,
+        student_no: s.student_no
+      }))
+    } else {
+      studentOptions.value = []
+      ElMessage.warning(res.message || '搜索失败')
+    }
+  } catch (error) {
+    console.error('搜索学生失败:', error)
+    ElMessage.error('搜索学生失败')
+    studentOptions.value = []
   } finally {
     studentLoading.value = false
   }
@@ -709,6 +703,15 @@ const formatDateTime = (dateStr) => {
 
 onMounted(() => {
   loadData()
+
+  // 检查路由参数，如果有 student_id 则自动打开新增弹窗
+  const { student_id, warning_id } = route.query
+  if (student_id) {
+    // 延迟打开弹窗，等待数据加载完成
+    setTimeout(() => {
+      openAddDialogWithStudent(parseInt(student_id), warning_id ? parseInt(warning_id) : null)
+    }, 500)
+  }
 })
 </script>
 

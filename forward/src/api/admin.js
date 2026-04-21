@@ -157,6 +157,53 @@ export function getCounselorDetail(id) {
     })
 }
 
+/**
+ * 获取辅导员管理的班级列表
+ * @param {number} id - 辅导员ID
+ */
+export function getCounselorClasses(id) {
+    return request({
+        url: `/auth/counselors/${id}/classes/`,
+        method: 'get'
+    })
+}
+
+/**
+ * 为辅导员分配班级
+ * @param {number} id - 辅导员ID
+ * @param {Array} classIds - 班级ID数组
+ */
+export function assignClassesToCounselor(id, classIds) {
+    return request({
+        url: `/auth/counselors/${id}/assign-classes/`,
+        method: 'post',
+        data: { class_ids: classIds }
+    })
+}
+
+/**
+ * 解除辅导员与班级的关联
+ * @param {number} id - 辅导员ID
+ * @param {number} classId - 班级ID
+ */
+export function removeClassFromCounselor(id, classId) {
+    return request({
+        url: `/auth/counselors/${id}/remove-class/`,
+        method: 'post',
+        data: { class_id: classId }
+    })
+}
+
+/**
+ * 获取可分配的班级列表（未被管理的班级）
+ */
+export function getAvailableClasses() {
+    return request({
+        url: '/auth/available-classes/',
+        method: 'get'
+    })
+}
+
 // ==================== 课程管理 ====================
 
 /**
