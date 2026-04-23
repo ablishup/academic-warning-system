@@ -192,6 +192,32 @@ def get_current_time():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
+def counselor_comment_data(warning):
+    """
+    解析counselor_suggestions字段，返回完整的辅导员评语数据
+    支持新格式（包含analysis等）和旧格式（纯数组）
+    """
+    suggestions_data = warning.counselor_suggestions or []
+    if isinstance(suggestions_data, dict):
+        # 新格式，包含完整的AI评语数据
+        return {
+            'summary': warning.counselor_comment or '',
+            'analysis': suggestions_data.get('analysis', ''),
+            'suggestions': suggestions_data.get('suggestions', []),
+            'action_plan': suggestions_data.get('action_plan', ''),
+            'talking_points': warning.counselor_talk_script or '',
+        }
+    else:
+        # 旧格式，suggestions_data是纯数组
+        return {
+            'summary': warning.counselor_comment or '',
+            'analysis': '',
+            'suggestions': suggestions_data if isinstance(suggestions_data, list) else [],
+            'action_plan': '',
+            'talking_points': warning.counselor_talk_script or '',
+        }
+
+
 # =============================================================================
 # 辅导员端AI评语接口（新增）
 # =============================================================================
@@ -314,8 +340,13 @@ def generate_counselor_comment(request):
 
             # 保存到数据库
             warning.counselor_comment = mock_data['summary']
-            warning.counselor_suggestions = mock_data['suggestions']
             warning.counselor_talk_script = mock_data.get('talking_points', '')
+            # 将完整的AI评语数据保存在JSON字段中
+            warning.counselor_suggestions = {
+                'suggestions': mock_data['suggestions'],
+                'analysis': mock_data.get('analysis', ''),
+                'action_plan': mock_data.get('action_plan', '')
+            }
             warning.ai_generated_at = timezone.now()
             warning.save()
 
@@ -364,10 +395,15 @@ def generate_counselor_comment(request):
                 'talking_points': '同学你好，老师想和你聊聊学习情况'
             }
 
-        # 保存到数据库
+        # 保存到数据库 - 保存完整的辅导员评语数据
         warning.counselor_comment = ai_data.get('summary', '')
-        warning.counselor_suggestions = ai_data.get('suggestions', [])
         warning.counselor_talk_script = ai_data.get('talking_points', '')
+        # 将完整的AI评语数据保存在JSON字段中
+        warning.counselor_suggestions = {
+            'suggestions': ai_data.get('suggestions', []),
+            'analysis': ai_data.get('analysis', ''),
+            'action_plan': ai_data.get('action_plan', '')
+        }
         warning.ai_generated_at = timezone.now()
 
         # 获取正确的用户ID（解决users表和auth_user表的外键问题）
@@ -462,11 +498,7 @@ def get_stored_comment(request, warning_id):
                     'comment': warning.ai_analysis or '',
                     'suggestions': warning.ai_suggestions or [],
                 },
-                'counselor_comment': {
-                    'summary': warning.counselor_comment or '',
-                    'suggestions': warning.counselor_suggestions or [],
-                    'talking_points': warning.counselor_talk_script or '',
-                },
+                'counselor_comment': counselor_comment_data(warning),
                 'generated_at': warning.ai_generated_at.strftime('%Y-%m-%d %H:%M:%S') if warning.ai_generated_at else None,
                 'sms_sent': warning.sms_sent,
                 'sms_sent_at': warning.sms_sent_at.strftime('%Y-%m-%d %H:%M:%S') if warning.sms_sent_at else None
