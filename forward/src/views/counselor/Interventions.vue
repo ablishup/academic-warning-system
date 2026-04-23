@@ -7,12 +7,62 @@
         <p>管理学生干预措施，跟踪干预效果</p>
       </div>
       <div class="header-actions">
+        <el-button v-if="selectedStudentId" @click="clearStudentFilter">
+          <el-icon><List /></el-icon>
+          查看全部
+        </el-button>
         <el-button type="primary" @click="openAddDialog">
           <el-icon><Plus /></el-icon>
           新增干预
         </el-button>
       </div>
     </div>
+
+    <!-- 学生信息卡片（从预警页面跳转时显示） -->
+    <el-card v-if="selectedStudentInfo" class="student-info-card" shadow="hover">
+      <div class="student-header">
+        <div class="student-profile">
+          <el-avatar :size="56" :style="{ background: getAvatarColor(selectedStudentInfo.student?.name) }">
+            {{ selectedStudentInfo.student?.name?.charAt(0) }}
+          </el-avatar>
+          <div class="profile-text">
+            <h3>{{ selectedStudentInfo.student?.name }} <span class="student-no">{{ selectedStudentInfo.student?.student_no }}</span></h3>
+            <div class="student-tags">
+              <el-tag v-if="selectedStudentInfo.warnings?.length > 0" :type="getRiskTagType(selectedStudentInfo.highest_risk)" effect="dark" size="small">
+                {{ getRiskLabel(selectedStudentInfo.highest_risk) }}
+              </el-tag>
+              <el-tag type="info" size="small">{{ selectedStudentInfo.warnings?.length || 0 }} 门课程预警</el-tag>
+              <el-tag v-if="selectedStudentInfo.avg_score" :type="getScoreTagType(selectedStudentInfo.avg_score)" size="small">
+                平均分 {{ selectedStudentInfo.avg_score }}
+              </el-tag>
+            </div>
+          </div>
+        </div>
+        <div class="student-actions">
+          <el-button type="primary" link @click="goToWarnings">
+            <el-icon><Warning /></el-icon>
+            查看预警详情
+          </el-button>
+        </div>
+      </div>
+
+      <!-- 预警课程列表 -->
+      <div v-if="selectedStudentInfo.warnings?.length > 0" class="warning-courses">
+        <div class="section-title">预警课程</div>
+        <div class="course-tags">
+          <el-tag
+            v-for="w in selectedStudentInfo.warnings"
+            :key="w.id"
+            :type="getRiskTagType(w.risk_level)"
+            effect="plain"
+            size="small"
+            class="course-tag"
+          >
+            {{ w.course?.name }} - {{ w.composite_score }}分
+          </el-tag>
+        </div>
+      </div>
+    </el-card>
 
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="stats-row">
@@ -370,12 +420,13 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Plus, FirstAidKit, CircleCheck, Timer, Search
+  Plus, FirstAidKit, CircleCheck, Timer, Search, List, Warning
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
   getInterventionRecords, createIntervention, updateIntervention,
-  getInterventionStats, getWarningRecords, searchStudents as searchStudentsApi
+  getInterventionStats, getWarningRecords, getWarningRecordsByStudent,
+  searchStudents as searchStudentsApi
 } from '@/api/counselor'
 
 // 路由
@@ -392,6 +443,10 @@ const evaluateDialogVisible = ref(false)
 const viewMode = ref('table')
 const selectedIntervention = ref(null)
 const addFormRef = ref(null)
+
+// 当前筛选的学生（从预警页面跳转）
+const selectedStudentId = ref(null)
+const selectedStudentInfo = ref(null)
 
 // 统计数据
 const stats = reactive({
@@ -459,6 +514,10 @@ const loadData = async () => {
       page_size: pagination.pageSize,
       ...filterForm
     }
+    // 如果指定了学生，添加学生筛选
+    if (selectedStudentId.value) {
+      params.student_id = selectedStudentId.value
+    }
     const res = await getInterventionRecords(params)
     if (res.code === 200) {
       interventions.value = res.data?.results || res.data || []
@@ -466,7 +525,7 @@ const loadData = async () => {
     }
 
     // 获取统计数据
-    const statsRes = await getInterventionStats()
+    const statsRes = await getInterventionStats(selectedStudentId.value)
     if (statsRes.code === 200) {
       const data = statsRes.data || {}
       stats.total = data.total || 156
@@ -483,6 +542,39 @@ const loadData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 加载学生预警信息
+const loadStudentWarningInfo = async (studentId) => {
+  if (!studentId) return
+  try {
+    const res = await getWarningRecordsByStudent()
+    if (res.code === 200) {
+      const students = res.data?.students || []
+      const studentData = students.find(s => s.student?.id === parseInt(studentId))
+      if (studentData) {
+        selectedStudentInfo.value = studentData
+      }
+    }
+  } catch (error) {
+    console.error('加载学生预警信息失败:', error)
+  }
+}
+
+// 清除学生筛选
+const clearStudentFilter = () => {
+  selectedStudentId.value = null
+  selectedStudentInfo.value = null
+  router.replace({ path: '/counselor/interventions', query: {} })
+  loadData()
+}
+
+// 跳转到预警页面
+const goToWarnings = () => {
+  router.push({
+    path: '/counselor/warnings',
+    query: selectedStudentId.value ? { student_id: selectedStudentId.value } : {}
+  })
 }
 
 
@@ -676,6 +768,22 @@ const getAvatarColor = (name) => {
   return colors[Math.abs(hash) % colors.length]
 }
 
+const getRiskTagType = (level) => {
+  const types = { high: 'danger', medium: 'warning', low: 'info', normal: 'success' }
+  return types[level] || 'info'
+}
+
+const getRiskLabel = (level) => {
+  const labels = { high: '高危', medium: '中等', low: '低危', normal: '正常' }
+  return labels[level] || level
+}
+
+const getScoreTagType = (score) => {
+  if (score < 60) return 'danger'
+  if (score < 75) return 'warning'
+  return 'success'
+}
+
 const getTypeTagType = (type) => {
   const types = { talk: 'primary', academic: 'success', psychological: 'warning', family: 'info', other: '' }
   return types[type] || ''
@@ -684,11 +792,6 @@ const getTypeTagType = (type) => {
 const getTypeLabel = (type) => {
   const labels = { talk: '谈话辅导', academic: '学业帮扶', psychological: '心理疏导', family: '家校联系', other: '其他' }
   return labels[type] || type
-}
-
-const getRiskLabel = (level) => {
-  const labels = { high: '高危', medium: '中等', low: '低危' }
-  return labels[level] || level
 }
 
 const formatDate = (dateStr) => {
@@ -702,15 +805,20 @@ const formatDateTime = (dateStr) => {
 }
 
 onMounted(() => {
-  loadData()
-
-  // 检查路由参数，如果有 student_id 则自动打开新增弹窗
+  // 检查路由参数，如果有 student_id 则加载学生信息
   const { student_id, warning_id } = route.query
   if (student_id) {
-    // 延迟打开弹窗，等待数据加载完成
+    selectedStudentId.value = parseInt(student_id)
+    // 加载学生预警信息和干预记录
+    loadStudentWarningInfo(student_id).then(() => {
+      loadData()
+    })
+    // 延迟打开新增弹窗
     setTimeout(() => {
       openAddDialogWithStudent(parseInt(student_id), warning_id ? parseInt(warning_id) : null)
-    }, 500)
+    }, 800)
+  } else {
+    loadData()
   }
 })
 </script>
@@ -910,5 +1018,68 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   margin-top: 24px;
+}
+
+/* 学生信息卡片 */
+.student-info-card {
+  margin-bottom: 24px;
+  border-radius: 12px;
+}
+
+.student-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.student-profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.profile-text h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: #1f2937;
+}
+
+.profile-text .student-no {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: normal;
+}
+
+.student-tags {
+  display: flex;
+  gap: 8px;
+}
+
+.student-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.warning-courses {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.course-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.course-tag {
+  font-size: 12px;
 }
 </style>
