@@ -271,7 +271,54 @@
     </el-card>
 
     <!-- 新增干预弹窗 -->
-    <el-dialog v-model="addDialogVisible" title="新增干预记录" width="600px">
+    <el-dialog v-model="addDialogVisible" title="新增干预记录" width="700px">
+      <!-- 学生预警信息卡片 -->
+      <div v-if="addForm.student_id && selectedStudentForDialog" class="student-warning-info">
+        <div class="student-profile-header">
+          <el-avatar :size="48" :style="{ background: getAvatarColor(selectedStudentForDialog.name) }"">
+            {{ selectedStudentForDialog.name?.charAt(0) }}
+          </el-avatar>
+          <div class="profile-details">
+            <div class="name">{{ selectedStudentForDialog.name }} <span class="student-no">{{ selectedStudentForDialog.student_no }}</span></div>
+            <div class="warning-count" v-if="dialogStudentWarnings.length > 0">
+              <el-tag :type="getRiskTagType(dialogHighestRisk)" effect="dark" size="small">
+                {{ getRiskLabel(dialogHighestRisk) }}
+              </el-tag>
+              <span class="count-text">{{ dialogStudentWarnings.length }} 门课程预警</span>
+            </div>
+            <div class="no-warning" v-else>
+              <el-tag type="success" size="small">暂无预警</el-tag>
+            </div>
+          </div>
+        </div>
+
+        <!-- 预警课程列表 -->
+        <div v-if="dialogStudentWarnings.length > 0" class="warning-courses-list">
+          <div class="section-title">选择要干预的课程（点击选择）：</div>
+          <div class="course-cards">
+            <div
+              v-for="w in dialogStudentWarnings"
+              :key="w.id"
+              :class="['course-card', { active: addForm.warning_id === w.id }]"
+              @click="selectWarningCourse(w.id)"
+            >
+              <div class="course-header">
+                <span class="course-name">{{ w.course?.name || w.course_name }}</span>
+                <el-tag :type="getRiskTagType(w.risk_level)" effect="dark" size="small">
+                  {{ getRiskLabel(w.risk_level) }}
+                </el-tag>
+              </div>
+              <div class="course-scores">
+                <span class="score-item">综合得分：<b :class="getScoreClass(w.composite_score)">{{ w.composite_score }}</b></span>
+                <span class="score-item" v-if="w.attendance_score !== undefined">出勤：{{ w.attendance_score }}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <el-divider />
+      </div>
+
       <el-form :model="addForm" label-width="100px" :rules="addRules" ref="addFormRef">
         <el-form-item label="学生" prop="student_id">
           <el-select
@@ -283,21 +330,12 @@
             :remote-method="searchStudents"
             :loading="studentLoading"
             style="width: 100%"
+            @change="onStudentChange"
           >
             <el-option
               v-for="item in studentOptions"
               :key="item.id"
               :label="`${item.name} (${item.student_no})`"
-              :value="item.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="关联预警" prop="warning_id">
-          <el-select v-model="addForm.warning_id" placeholder="选择关联的预警（可选）" clearable style="width: 100%">
-            <el-option
-              v-for="item in warningOptions"
-              :key="item.id"
-              :label="`${item.course_name} - ${getRiskLabel(item.risk_level)}`"
               :value="item.id"
             />
           </el-select>
@@ -447,6 +485,11 @@ const addFormRef = ref(null)
 // 当前筛选的学生（从预警页面跳转）
 const selectedStudentId = ref(null)
 const selectedStudentInfo = ref(null)
+
+// 新增弹窗中的学生预警信息
+const selectedStudentForDialog = ref(null)
+const dialogStudentWarnings = ref([])
+const dialogHighestRisk = ref('normal')
 
 // 统计数据
 const stats = reactive({
@@ -611,18 +654,49 @@ const openAddDialog = async () => {
   addForm.intervention_time = new Date()
   addForm.content = ''
   addForm.follow_up_plan = ''
-
-  // 加载预警选项
-  try {
-    const res = await getWarningRecords({ status: 'active', page_size: 100 })
-    if (res.code === 200) {
-      warningOptions.value = res.data?.results || res.data || []
-    }
-  } catch (error) {
-    console.error('加载预警列表失败:', error)
-  }
+  selectedStudentForDialog.value = null
+  dialogStudentWarnings.value = []
+  dialogHighestRisk.value = 'normal'
 
   addDialogVisible.value = true
+}
+
+// 学生选择变化时加载预警信息
+const onStudentChange = async (studentId) => {
+  if (!studentId) {
+    selectedStudentForDialog.value = null
+    dialogStudentWarnings.value = []
+    return
+  }
+
+  // 获取学生信息
+  const student = studentOptions.value.find(s => s.id === studentId)
+  if (student) {
+    selectedStudentForDialog.value = student
+  }
+
+  // 加载该学生的预警信息
+  try {
+    const res = await getWarningRecordsByStudent()
+    if (res.code === 200) {
+      const students = res.data?.students || []
+      const studentData = students.find(s => s.student?.id === studentId)
+      if (studentData) {
+        dialogStudentWarnings.value = studentData.warnings || []
+        dialogHighestRisk.value = studentData.highest_risk || 'normal'
+      } else {
+        dialogStudentWarnings.value = []
+        dialogHighestRisk.value = 'normal'
+      }
+    }
+  } catch (error) {
+    console.error('加载学生预警信息失败:', error)
+  }
+}
+
+// 选择预警课程
+const selectWarningCourse = (warningId) => {
+  addForm.warning_id = addForm.warning_id === warningId ? null : warningId
 }
 
 // 带学生信息打开新增弹窗（从预警页面跳转过来）
@@ -635,28 +709,35 @@ const openAddDialogWithStudent = async (studentId, warningId = null) => {
   addForm.content = ''
   addForm.follow_up_plan = ''
 
-  // 加载预警选项
-  try {
-    const res = await getWarningRecords({ status: 'active', page_size: 100 })
-    if (res.code === 200) {
-      warningOptions.value = res.data?.results || res.data || []
-    }
-  } catch (error) {
-    console.error('加载预警列表失败:', error)
-  }
-
   // 加载学生信息并填充到选项中
   if (studentId) {
     studentLoading.value = true
     try {
-      const res = await searchStudentsApi(studentId.toString())
-      if (res.code === 200) {
-        const students = res.data || []
+      // 获取学生信息
+      const searchRes = await searchStudentsApi(studentId.toString())
+      if (searchRes.code === 200) {
+        const students = searchRes.data || []
         studentOptions.value = students.map(s => ({
           id: s.id,
           name: s.name,
           student_no: s.student_no
         }))
+        // 设置当前学生
+        const currentStudent = students.find(s => s.id === studentId)
+        if (currentStudent) {
+          selectedStudentForDialog.value = currentStudent
+        }
+      }
+
+      // 加载该学生的预警信息
+      const warningRes = await getWarningRecordsByStudent()
+      if (warningRes.code === 200) {
+        const allStudents = warningRes.data?.students || []
+        const studentData = allStudents.find(s => s.student?.id === studentId)
+        if (studentData) {
+          dialogStudentWarnings.value = studentData.warnings || []
+          dialogHighestRisk.value = studentData.highest_risk || 'normal'
+        }
       }
     } catch (error) {
       console.error('加载学生信息失败:', error)
@@ -782,6 +863,12 @@ const getScoreTagType = (score) => {
   if (score < 60) return 'danger'
   if (score < 75) return 'warning'
   return 'success'
+}
+
+const getScoreClass = (score) => {
+  if (score < 60) return 'score-danger'
+  if (score < 75) return 'score-warning'
+  return 'score-success'
 }
 
 const getTypeTagType = (type) => {
@@ -1019,6 +1106,114 @@ onMounted(() => {
   justify-content: center;
   margin-top: 24px;
 }
+
+/* 新增弹窗中的学生预警信息 */
+.student-warning-info {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.student-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.profile-details .name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.profile-details .student-no {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: normal;
+  margin-left: 8px;
+}
+
+.profile-details .warning-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.profile-details .count-text {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.profile-details .no-warning {
+  margin-top: 6px;
+}
+
+.warning-courses-list {
+  margin-top: 12px;
+}
+
+.warning-courses-list .section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 10px;
+}
+
+.course-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.course-card {
+  padding: 12px;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.course-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.course-card.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.course-card .course-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.course-card .course-name {
+  font-weight: 500;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.course-card .course-scores {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.course-card .score-item b {
+  font-weight: 600;
+}
+
+.score-danger { color: #ef4444; }
+.score-warning { color: #f59e0b; }
+.score-success { color: #10b981; }
 
 /* 学生信息卡片 */
 .student-info-card {
