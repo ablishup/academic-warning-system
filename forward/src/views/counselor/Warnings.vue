@@ -345,61 +345,6 @@
             </div>
           </el-card>
 
-          <!-- 快捷操作卡片 -->
-          <el-card class="quick-actions-card" shadow="hover" v-if="selectedRow">
-            <template #header>
-              <span class="card-title">学生信息</span>
-            </template>
-            <div class="student-info">
-              <div class="info-item">
-                <span class="info-label">姓名：</span>
-                <span class="info-value">{{ selectedRow.student?.name }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">学号：</span>
-                <span class="info-value">{{ selectedRow.student?.student_no }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">班级：</span>
-                <span class="info-value">{{ selectedRow.student?.class_name || '-' }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">预警课程数：</span>
-                <span class="info-value">{{ selectedRow.warnings?.length || 0 }} 门</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">最高风险：</span>
-                <el-tag :type="getRiskTagType(selectedRow.highest_risk)" size="small" effect="dark">
-                  {{ getRiskLabel(selectedRow.highest_risk) }}
-                </el-tag>
-              </div>
-              <el-divider />
-              <div class="info-item">
-                <span class="info-label">出勤率：</span>
-                <span class="info-value" :class="getScoreClass(selectedRow.attendance_score)">
-                  {{ selectedRow.attendance_score }}%
-                </span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">学习进度：</span>
-                <span class="info-value" :class="getScoreClass(selectedRow.progress_score)">
-                  {{ selectedRow.progress_score }}%
-                </span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">作业成绩：</span>
-                <span class="info-value" :class="getScoreClass(selectedRow.homework_score)">
-                  {{ selectedRow.homework_score }}
-                </span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">考试成绩：</span>
-                <span class="info-value" :class="getScoreClass(selectedRow.exam_score)">
-                  {{ selectedRow.exam_score }}
-                </span>
-              </div>
-            </div>
-          </el-card>
         </div>
       </el-col>
     </el-row>

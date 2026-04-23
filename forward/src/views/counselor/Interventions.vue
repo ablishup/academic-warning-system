@@ -916,34 +916,46 @@ const openAddDialogWithStudent = async (studentId, warningId = null) => {
   if (studentId) {
     studentLoading.value = true
     try {
-      // 获取学生信息
-      const searchRes = await searchStudentsApi(studentId.toString())
-      if (searchRes.code === 200) {
-        const students = searchRes.data || []
-        studentOptions.value = students.map(s => ({
-          id: s.id,
-          name: s.name,
-          student_no: s.student_no,
-          class_name: s.class_name
-        }))
-        // 设置当前学生
-        const currentStudent = students.find(s => s.id === studentId)
-        if (currentStudent) {
-          selectedStudentForDialog.value = currentStudent
-        }
-      }
-
-      // 加载该学生的预警信息
+      // 先加载该学生的预警信息（包含学生基本信息）
       const warningRes = await getWarningRecordsByStudent()
       if (warningRes.code === 200) {
         const allStudents = warningRes.data?.students || []
         const studentData = allStudents.find(s => s.student?.id === studentId)
-        if (studentData) {
+        if (studentData && studentData.student) {
+          // 设置学生选项，确保el-select能正确显示
+          studentOptions.value = [{
+            id: studentData.student.id,
+            name: studentData.student.name,
+            student_no: studentData.student.student_no,
+            class_name: studentData.student.class_name
+          }]
+          // 设置当前学生
+          selectedStudentForDialog.value = {
+            id: studentData.student.id,
+            name: studentData.student.name,
+            student_no: studentData.student.student_no,
+            class_name: studentData.student.class_name
+          }
+          // 设置预警信息
           dialogStudentWarnings.value = studentData.warnings || []
           dialogHighestRisk.value = studentData.highest_risk || 'normal'
-          // 同时更新selectedStudentForDialog的class_name
-          if (studentData.student && selectedStudentForDialog.value) {
-            selectedStudentForDialog.value.class_name = studentData.student.class_name
+        }
+      }
+
+      // 如果预警数据中没有找到学生，尝试搜索API
+      if (!selectedStudentForDialog.value) {
+        const searchRes = await searchStudentsApi(studentId.toString())
+        if (searchRes.code === 200) {
+          const students = searchRes.data || []
+          studentOptions.value = students.map(s => ({
+            id: s.id,
+            name: s.name,
+            student_no: s.student_no,
+            class_name: s.class_name
+          }))
+          const currentStudent = students.find(s => s.id === studentId)
+          if (currentStudent) {
+            selectedStudentForDialog.value = currentStudent
           }
         }
       }
