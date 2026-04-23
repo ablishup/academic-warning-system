@@ -18,52 +18,6 @@
       </div>
     </div>
 
-    <!-- 学生信息卡片（从预警页面跳转时显示） -->
-    <el-card v-if="selectedStudentInfo" class="student-info-card" shadow="hover">
-      <div class="student-header">
-        <div class="student-profile">
-          <el-avatar :size="56" :style="{ background: getAvatarColor(selectedStudentInfo.student?.name) }">
-            {{ selectedStudentInfo.student?.name?.charAt(0) }}
-          </el-avatar>
-          <div class="profile-text">
-            <h3>{{ selectedStudentInfo.student?.name }} <span class="student-no">{{ selectedStudentInfo.student?.student_no }}</span></h3>
-            <div class="student-tags">
-              <el-tag v-if="selectedStudentInfo.warnings?.length > 0" :type="getRiskTagType(selectedStudentInfo.highest_risk)" effect="dark" size="small">
-                {{ getRiskLabel(selectedStudentInfo.highest_risk) }}
-              </el-tag>
-              <el-tag type="info" size="small">{{ selectedStudentInfo.warnings?.length || 0 }} 门课程预警</el-tag>
-              <el-tag v-if="selectedStudentInfo.avg_score" :type="getScoreTagType(selectedStudentInfo.avg_score)" size="small">
-                平均分 {{ selectedStudentInfo.avg_score }}
-              </el-tag>
-            </div>
-          </div>
-        </div>
-        <div class="student-actions">
-          <el-button type="primary" link @click="goToWarnings">
-            <el-icon><Warning /></el-icon>
-            查看预警详情
-          </el-button>
-        </div>
-      </div>
-
-      <!-- 预警课程列表 -->
-      <div v-if="selectedStudentInfo.warnings?.length > 0" class="warning-courses">
-        <div class="section-title">预警课程</div>
-        <div class="course-tags">
-          <el-tag
-            v-for="w in selectedStudentInfo.warnings"
-            :key="w.id"
-            :type="getRiskTagType(w.risk_level)"
-            effect="plain"
-            size="small"
-            class="course-tag"
-          >
-            {{ w.course?.name }} - {{ w.composite_score }}分
-          </el-tag>
-        </div>
-      </div>
-    </el-card>
-
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="stats-row">
       <el-col :span="8">
@@ -275,7 +229,30 @@
       <div class="dialog-content">
         <!-- 左侧：学生信息和表单 -->
         <div class="dialog-left">
-          <!-- 学生信息卡片（只读） -->
+          <!-- 学生选择（始终显示，但从预警跳转时已自动填充） -->
+          <el-form :model="addForm" label-width="100px" :rules="addRules" ref="addFormRef">
+            <el-form-item label="学生" prop="student_id">
+              <el-select
+                v-model="addForm.student_id"
+                filterable
+                remote
+                reserve-keyword
+                placeholder="输入学号或姓名搜索"
+                :remote-method="searchStudents"
+                :loading="studentLoading"
+                style="width: 100%"
+                @change="onStudentChange"
+              >
+                <el-option
+                  v-for="item in studentOptions"
+                  :key="item.id"
+                  :label="`${item.name} (${item.student_no})`"
+                  :value="item.id"
+                />
+              </el-select>
+            </el-form-item>
+
+            <!-- 学生信息卡片（选择学生后显示） -->
           <div v-if="addForm.student_id && selectedStudentForDialog" class="student-info-display">
             <div class="student-profile-header">
               <el-avatar :size="56" :style="{ background: getAvatarColor(selectedStudentForDialog.name) }">
@@ -323,33 +300,8 @@
             <el-divider />
           </div>
 
-          <!-- 学生选择（仅在未指定学生时显示） -->
-          <el-form v-if="!addForm.student_id" :model="addForm" label-width="100px" :rules="addRules" ref="addFormRef">
-            <el-form-item label="学生" prop="student_id">
-              <el-select
-                v-model="addForm.student_id"
-                filterable
-                remote
-                reserve-keyword
-                placeholder="输入学号或姓名搜索"
-                :remote-method="searchStudents"
-                :loading="studentLoading"
-                style="width: 100%"
-                @change="onStudentChange"
-              >
-                <el-option
-                  v-for="item in studentOptions"
-                  :key="item.id"
-                  :label="`${item.name} (${item.student_no})`"
-                  :value="item.id"
-                />
-              </el-select>
-            </el-form-item>
-          </el-form>
-
-          <!-- 干预表单 -->
-          <el-form :model="addForm" label-width="100px" :rules="addRules" ref="addFormRef">
-            <el-form-item label="干预类型" prop="intervention_type">
+          <!-- 干预表单字段 -->
+          <el-form-item label="干预类型" prop="intervention_type">
               <el-select v-model="addForm.intervention_type" placeholder="选择干预类型" style="width: 100%">
                 <el-option label="谈话辅导" value="talk" />
                 <el-option label="学业帮扶" value="academic" />
