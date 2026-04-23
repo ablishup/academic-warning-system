@@ -271,109 +271,203 @@
     </el-card>
 
     <!-- 新增干预弹窗 -->
-    <el-dialog v-model="addDialogVisible" title="新增干预记录" width="700px">
-      <!-- 学生预警信息卡片 -->
-      <div v-if="addForm.student_id && selectedStudentForDialog" class="student-warning-info">
-        <div class="student-profile-header">
-          <el-avatar :size="48" :style="{ background: getAvatarColor(selectedStudentForDialog.name) }"">
-            {{ selectedStudentForDialog.name?.charAt(0) }}
-          </el-avatar>
-          <div class="profile-details">
-            <div class="name">{{ selectedStudentForDialog.name }} <span class="student-no">{{ selectedStudentForDialog.student_no }}</span></div>
-            <div class="warning-count" v-if="dialogStudentWarnings.length > 0">
-              <el-tag :type="getRiskTagType(dialogHighestRisk)" effect="dark" size="small">
-                {{ getRiskLabel(dialogHighestRisk) }}
-              </el-tag>
-              <span class="count-text">{{ dialogStudentWarnings.length }} 门课程预警</span>
+    <el-dialog v-model="addDialogVisible" title="新增干预记录" width="900px" class="intervention-dialog">
+      <div class="dialog-content">
+        <!-- 左侧：学生信息和表单 -->
+        <div class="dialog-left">
+          <!-- 学生信息卡片（只读） -->
+          <div v-if="addForm.student_id && selectedStudentForDialog" class="student-info-display">
+            <div class="student-profile-header">
+              <el-avatar :size="56" :style="{ background: getAvatarColor(selectedStudentForDialog.name) }">
+                {{ selectedStudentForDialog.name?.charAt(0) }}
+              </el-avatar>
+              <div class="profile-details">
+                <div class="name">{{ selectedStudentForDialog.name }} <span class="student-no">{{ selectedStudentForDialog.student_no }}</span></div>
+                <div class="class-info" v-if="selectedStudentForDialog.class_name">{{ selectedStudentForDialog.class_name }}</div>
+                <div class="warning-count" v-if="dialogStudentWarnings.length > 0">
+                  <el-tag :type="getRiskTagType(dialogHighestRisk)" effect="dark" size="small">
+                    {{ getRiskLabel(dialogHighestRisk) }}
+                  </el-tag>
+                  <span class="count-text">{{ dialogStudentWarnings.length }} 门课程预警</span>
+                </div>
+                <div class="no-warning" v-else>
+                  <el-tag type="success" size="small">暂无预警</el-tag>
+                </div>
+              </div>
             </div>
-            <div class="no-warning" v-else>
-              <el-tag type="success" size="small">暂无预警</el-tag>
+
+            <!-- 预警课程列表 -->
+            <div v-if="dialogStudentWarnings.length > 0" class="warning-courses-list">
+              <div class="section-title">选择要干预的课程（点击选择）：</div>
+              <div class="course-cards">
+                <div
+                  v-for="w in dialogStudentWarnings"
+                  :key="w.id"
+                  :class="['course-card', { active: addForm.warning_id === w.id }]"
+                  @click="selectWarningCourse(w.id)"
+                >
+                  <div class="course-header">
+                    <span class="course-name">{{ w.course?.name || w.course_name }}</span>
+                    <el-tag :type="getRiskTagType(w.risk_level)" effect="dark" size="small">
+                      {{ getRiskLabel(w.risk_level) }}
+                    </el-tag>
+                  </div>
+                  <div class="course-scores">
+                    <span class="score-item">综合得分：<b :class="getScoreClass(w.composite_score)">{{ w.composite_score }}</b></span>
+                    <span class="score-item" v-if="w.attendance_score !== undefined">出勤：{{ w.attendance_score }}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <el-divider />
+          </div>
+
+          <!-- 学生选择（仅在未指定学生时显示） -->
+          <el-form v-if="!addForm.student_id" :model="addForm" label-width="100px" :rules="addRules" ref="addFormRef">
+            <el-form-item label="学生" prop="student_id">
+              <el-select
+                v-model="addForm.student_id"
+                filterable
+                remote
+                reserve-keyword
+                placeholder="输入学号或姓名搜索"
+                :remote-method="searchStudents"
+                :loading="studentLoading"
+                style="width: 100%"
+                @change="onStudentChange"
+              >
+                <el-option
+                  v-for="item in studentOptions"
+                  :key="item.id"
+                  :label="`${item.name} (${item.student_no})`"
+                  :value="item.id"
+                />
+              </el-select>
+            </el-form-item>
+          </el-form>
+
+          <!-- 干预表单 -->
+          <el-form :model="addForm" label-width="100px" :rules="addRules" ref="addFormRef">
+            <el-form-item label="干预类型" prop="intervention_type">
+              <el-select v-model="addForm.intervention_type" placeholder="选择干预类型" style="width: 100%">
+                <el-option label="谈话辅导" value="talk" />
+                <el-option label="学业帮扶" value="academic" />
+                <el-option label="心理疏导" value="psychological" />
+                <el-option label="家校联系" value="family" />
+                <el-option label="其他" value="other" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="干预时间" prop="intervention_time">
+              <el-date-picker
+                v-model="addForm.intervention_time"
+                type="datetime"
+                placeholder="选择干预时间"
+                style="width: 100%"
+              />
+            </el-form-item>
+            <el-form-item label="干预内容" prop="content">
+              <el-input
+                v-model="addForm.content"
+                type="textarea"
+                :rows="4"
+                placeholder="详细描述干预内容..."
+              />
+            </el-form-item>
+            <el-form-item label="后续计划">
+              <el-input
+                v-model="addForm.follow_up_plan"
+                type="textarea"
+                :rows="2"
+                placeholder="输入后续跟进计划（可选）..."
+              />
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <!-- 右侧：AI评语参考 -->
+        <div class="dialog-right" v-if="addForm.student_id && dialogAIComment.summary">
+          <div class="ai-reference-panel">
+            <div class="ai-panel-header">
+              <el-icon :size="18" color="#7c3aed"><MagicStick /></el-icon>
+              <span>AI评语参考</span>
+            </div>
+
+            <div class="ai-panel-content">
+              <!-- 问题分析 -->
+              <div class="ai-section" v-if="dialogAIComment.analysis">
+                <h4 class="section-title">
+                  <el-icon><TrendCharts /></el-icon>
+                  问题分析
+                </h4>
+                <p class="section-content">{{ dialogAIComment.analysis }}</p>
+              </div>
+
+              <!-- 干预建议 -->
+              <div class="ai-section" v-if="dialogAIComment.suggestions && dialogAIComment.suggestions.length > 0">
+                <h4 class="section-title">
+                  <el-icon><List /></el-icon>
+                  干预建议
+                  <el-button type="primary" link size="small" @click="applyAISuggestions">
+                    <el-icon><CopyDocument /></el-icon>
+                    引用建议
+                  </el-button>
+                </h4>
+                <ul class="suggestion-list">
+                  <li v-for="(item, index) in dialogAIComment.suggestions" :key="index">
+                    <el-icon color="#10b981"><CircleCheck /></el-icon>
+                    <span>{{ item }}</span>
+                  </li>
+                </ul>
+              </div>
+
+              <!-- 沟通话术 -->
+              <div class="ai-section talking-points" v-if="dialogAIComment.talking_points">
+                <h4 class="section-title">
+                  <el-icon><ChatDotRound /></el-icon>
+                  沟通话术
+                  <el-button type="primary" link size="small" @click="applyTalkingPoints">
+                    <el-icon><CopyDocument /></el-icon>
+                    引用话术
+                  </el-button>
+                </h4>
+                <div class="talking-box">
+                  <p>{{ dialogAIComment.talking_points }}</p>
+                </div>
+              </div>
+
+              <!-- 行动计划 -->
+              <div class="ai-section" v-if="dialogAIComment.action_plan">
+                <h4 class="section-title">
+                  <el-icon><Calendar /></el-icon>
+                  行动计划
+                  <el-button type="primary" link size="small" @click="applyActionPlan">
+                    <el-icon><CopyDocument /></el-icon>
+                    引用计划
+                  </el-button>
+                </h4>
+                <p class="section-content">{{ dialogAIComment.action_plan }}</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- 预警课程列表 -->
-        <div v-if="dialogStudentWarnings.length > 0" class="warning-courses-list">
-          <div class="section-title">选择要干预的课程（点击选择）：</div>
-          <div class="course-cards">
-            <div
-              v-for="w in dialogStudentWarnings"
-              :key="w.id"
-              :class="['course-card', { active: addForm.warning_id === w.id }]"
-              @click="selectWarningCourse(w.id)"
-            >
-              <div class="course-header">
-                <span class="course-name">{{ w.course?.name || w.course_name }}</span>
-                <el-tag :type="getRiskTagType(w.risk_level)" effect="dark" size="small">
-                  {{ getRiskLabel(w.risk_level) }}
-                </el-tag>
-              </div>
-              <div class="course-scores">
-                <span class="score-item">综合得分：<b :class="getScoreClass(w.composite_score)">{{ w.composite_score }}</b></span>
-                <span class="score-item" v-if="w.attendance_score !== undefined">出勤：{{ w.attendance_score }}%</span>
-              </div>
-            </div>
+        <!-- 右侧空状态（当没有AI评语时） -->
+        <div class="dialog-right" v-else-if="addForm.student_id">
+          <div class="ai-reference-panel empty">
+            <el-empty description="暂无AI评语">
+              <template #image>
+                <el-icon :size="48" color="#cbd5e1"><MagicStick /></el-icon>
+              </template>
+              <el-button type="primary" @click="generateDialogAIComment" :loading="dialogAILoading">
+                <el-icon><MagicStick /></el-icon>
+                生成AI评语
+              </el-button>
+            </el-empty>
           </div>
         </div>
-
-        <el-divider />
       </div>
 
-      <el-form :model="addForm" label-width="100px" :rules="addRules" ref="addFormRef">
-        <el-form-item label="学生" prop="student_id">
-          <el-select
-            v-model="addForm.student_id"
-            filterable
-            remote
-            reserve-keyword
-            placeholder="输入学号或姓名搜索"
-            :remote-method="searchStudents"
-            :loading="studentLoading"
-            style="width: 100%"
-            @change="onStudentChange"
-          >
-            <el-option
-              v-for="item in studentOptions"
-              :key="item.id"
-              :label="`${item.name} (${item.student_no})`"
-              :value="item.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="干预类型" prop="intervention_type">
-          <el-select v-model="addForm.intervention_type" placeholder="选择干预类型" style="width: 100%">
-            <el-option label="谈话辅导" value="talk" />
-            <el-option label="学业帮扶" value="academic" />
-            <el-option label="心理疏导" value="psychological" />
-            <el-option label="家校联系" value="family" />
-            <el-option label="其他" value="other" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="干预时间" prop="intervention_time">
-          <el-date-picker
-            v-model="addForm.intervention_time"
-            type="datetime"
-            placeholder="选择干预时间"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="干预内容" prop="content">
-          <el-input
-            v-model="addForm.content"
-            type="textarea"
-            :rows="4"
-            placeholder="详细描述干预内容..."
-          />
-        </el-form-item>
-        <el-form-item label="后续计划">
-          <el-input
-            v-model="addForm.follow_up_plan"
-            type="textarea"
-            :rows="2"
-            placeholder="输入后续跟进计划（可选）..."
-          />
-        </el-form-item>
-      </el-form>
       <template #footer>
         <el-button @click="addDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitAdd" :loading="submitting">确认</el-button>
@@ -458,13 +552,14 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Plus, FirstAidKit, CircleCheck, Timer, Search, List, Warning
+  Plus, FirstAidKit, CircleCheck, Timer, Search, List, Warning,
+  MagicStick, TrendCharts, ChatDotRound, Calendar, CopyDocument
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
   getInterventionRecords, createIntervention, updateIntervention,
   getInterventionStats, getWarningRecords, getWarningRecordsByStudent,
-  searchStudents as searchStudentsApi
+  searchStudents as searchStudentsApi, generateCounselorComment, getStoredComment
 } from '@/api/counselor'
 
 // 路由
@@ -490,6 +585,17 @@ const selectedStudentInfo = ref(null)
 const selectedStudentForDialog = ref(null)
 const dialogStudentWarnings = ref([])
 const dialogHighestRisk = ref('normal')
+
+// 弹窗中的AI评语
+const dialogAIComment = reactive({
+  summary: '',
+  analysis: '',
+  suggestions: [],
+  action_plan: '',
+  talking_points: '',
+  generated_at: ''
+})
+const dialogAILoading = ref(false)
 
 // 统计数据
 const stats = reactive({
@@ -658,6 +764,14 @@ const openAddDialog = async () => {
   dialogStudentWarnings.value = []
   dialogHighestRisk.value = 'normal'
 
+  // 清空AI评语
+  dialogAIComment.summary = ''
+  dialogAIComment.analysis = ''
+  dialogAIComment.suggestions = []
+  dialogAIComment.action_plan = ''
+  dialogAIComment.talking_points = ''
+  dialogAIComment.generated_at = ''
+
   addDialogVisible.value = true
 }
 
@@ -666,6 +780,13 @@ const onStudentChange = async (studentId) => {
   if (!studentId) {
     selectedStudentForDialog.value = null
     dialogStudentWarnings.value = []
+    // 清空AI评语
+    dialogAIComment.summary = ''
+    dialogAIComment.analysis = ''
+    dialogAIComment.suggestions = []
+    dialogAIComment.action_plan = ''
+    dialogAIComment.talking_points = ''
+    dialogAIComment.generated_at = ''
     return
   }
 
@@ -684,11 +805,18 @@ const onStudentChange = async (studentId) => {
       if (studentData) {
         dialogStudentWarnings.value = studentData.warnings || []
         dialogHighestRisk.value = studentData.highest_risk || 'normal'
+        // 同时更新class_name
+        if (studentData.student && selectedStudentForDialog.value) {
+          selectedStudentForDialog.value.class_name = studentData.student.class_name
+        }
       } else {
         dialogStudentWarnings.value = []
         dialogHighestRisk.value = 'normal'
       }
     }
+
+    // 加载AI评语
+    await loadDialogAIComment(studentId)
   } catch (error) {
     console.error('加载学生预警信息失败:', error)
   }
@@ -697,6 +825,121 @@ const onStudentChange = async (studentId) => {
 // 选择预警课程
 const selectWarningCourse = (warningId) => {
   addForm.warning_id = addForm.warning_id === warningId ? null : warningId
+}
+
+// 加载弹窗中的AI评语
+const loadDialogAIComment = async (studentId) => {
+  if (!studentId) return
+
+  dialogAILoading.value = true
+  try {
+    // 先尝试获取已存储的AI评语
+    const warnings = dialogStudentWarnings.value
+    if (warnings.length > 0) {
+      const res = await getStoredComment(warnings[0].id)
+      if (res.code === 200) {
+        const data = res.data || {}
+        const counselorComment = data.counselor_comment || {}
+
+        dialogAIComment.summary = counselorComment.summary || ''
+        dialogAIComment.analysis = counselorComment.analysis || ''
+        dialogAIComment.suggestions = counselorComment.suggestions || []
+        dialogAIComment.action_plan = counselorComment.action_plan || ''
+        dialogAIComment.talking_points = counselorComment.talking_points || ''
+        dialogAIComment.generated_at = data.generated_at || ''
+        return
+      }
+    }
+
+    // 如果没有存储的评语，清空
+    dialogAIComment.summary = ''
+    dialogAIComment.analysis = ''
+    dialogAIComment.suggestions = []
+    dialogAIComment.action_plan = ''
+    dialogAIComment.talking_points = ''
+    dialogAIComment.generated_at = ''
+  } catch (error) {
+    console.error('加载AI评语失败:', error)
+    // 清空AI评语
+    dialogAIComment.summary = ''
+    dialogAIComment.analysis = ''
+    dialogAIComment.suggestions = []
+    dialogAIComment.action_plan = ''
+    dialogAIComment.talking_points = ''
+    dialogAIComment.generated_at = ''
+  } finally {
+    dialogAILoading.value = false
+  }
+}
+
+// 生成弹窗中的AI评语
+const generateDialogAIComment = async () => {
+  if (!addForm.student_id || dialogStudentWarnings.value.length === 0) {
+    ElMessage.warning('请先选择学生和预警课程')
+    return
+  }
+
+  dialogAILoading.value = true
+  try {
+    const warningId = dialogStudentWarnings.value[0]?.id
+    const res = await generateCounselorComment({
+      student_id: addForm.student_id,
+      warning_id: warningId
+    })
+
+    if (res.code === 200) {
+      const data = res.data || {}
+      dialogAIComment.summary = data.summary || ''
+      dialogAIComment.analysis = data.analysis || ''
+      dialogAIComment.suggestions = data.suggestions || []
+      dialogAIComment.action_plan = data.action_plan || ''
+      dialogAIComment.talking_points = data.talking_points || ''
+      dialogAIComment.generated_at = new Date().toLocaleString('zh-CN')
+      ElMessage.success('AI评语生成成功')
+    }
+  } catch (error) {
+    console.error('生成AI评语失败:', error)
+    ElMessage.error('生成AI评语失败，请稍后重试')
+  } finally {
+    dialogAILoading.value = false
+  }
+}
+
+// 引用AI建议到干预内容
+const applyAISuggestions = () => {
+  if (!dialogAIComment.suggestions || dialogAIComment.suggestions.length === 0) return
+
+  const suggestions = dialogAIComment.suggestions.map((s, i) => `${i + 1}. ${s}`).join('\n')
+  if (addForm.content) {
+    addForm.content += '\n\n【AI建议参考】\n' + suggestions
+  } else {
+    addForm.content = '【AI建议参考】\n' + suggestions
+  }
+  ElMessage.success('已引用AI建议到干预内容')
+}
+
+// 引用沟通话术到干预内容
+const applyTalkingPoints = () => {
+  if (!dialogAIComment.talking_points) return
+
+  if (addForm.content) {
+    addForm.content += '\n\n【沟通话术参考】\n' + dialogAIComment.talking_points
+  } else {
+    addForm.content = '【沟通话术参考】\n' + dialogAIComment.talking_points
+  }
+  ElMessage.success('已引用沟通话术到干预内容')
+}
+
+// 引用行动计划到后续计划
+const applyActionPlan = () => {
+  if (!dialogAIComment.action_plan) return
+
+  if (addForm.follow_up_plan) {
+    addForm.follow_up_plan += '\n\n【AI行动计划参考】\n' + dialogAIComment.action_plan
+  } else {
+    addForm.follow_up_plan = '【AI行动计划参考】\n' + dialogAIComment.action_plan
+  }
+  ElMessage.success('已引用行动计划到后续计划')
 }
 
 // 带学生信息打开新增弹窗（从预警页面跳转过来）
@@ -709,6 +952,14 @@ const openAddDialogWithStudent = async (studentId, warningId = null) => {
   addForm.content = ''
   addForm.follow_up_plan = ''
 
+  // 重置AI评语
+  dialogAIComment.summary = ''
+  dialogAIComment.analysis = ''
+  dialogAIComment.suggestions = []
+  dialogAIComment.action_plan = ''
+  dialogAIComment.talking_points = ''
+  dialogAIComment.generated_at = ''
+
   // 加载学生信息并填充到选项中
   if (studentId) {
     studentLoading.value = true
@@ -720,7 +971,8 @@ const openAddDialogWithStudent = async (studentId, warningId = null) => {
         studentOptions.value = students.map(s => ({
           id: s.id,
           name: s.name,
-          student_no: s.student_no
+          student_no: s.student_no,
+          class_name: s.class_name
         }))
         // 设置当前学生
         const currentStudent = students.find(s => s.id === studentId)
@@ -737,8 +989,15 @@ const openAddDialogWithStudent = async (studentId, warningId = null) => {
         if (studentData) {
           dialogStudentWarnings.value = studentData.warnings || []
           dialogHighestRisk.value = studentData.highest_risk || 'normal'
+          // 同时更新selectedStudentForDialog的class_name
+          if (studentData.student && selectedStudentForDialog.value) {
+            selectedStudentForDialog.value.class_name = studentData.student.class_name
+          }
         }
       }
+
+      // 加载AI评语
+      await loadDialogAIComment(studentId)
     } catch (error) {
       console.error('加载学生信息失败:', error)
     } finally {
@@ -1107,8 +1366,113 @@ onMounted(() => {
   margin-top: 24px;
 }
 
-/* 新增弹窗中的学生预警信息 */
-.student-warning-info {
+/* 弹窗内容布局 */
+.dialog-content {
+  display: flex;
+  gap: 20px;
+  min-height: 500px;
+}
+
+.dialog-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.dialog-right {
+  width: 360px;
+  flex-shrink: 0;
+}
+
+/* AI参考面板 */
+.ai-reference-panel {
+  background: #fafafa;
+  border-radius: 12px;
+  padding: 16px;
+  height: 100%;
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+.ai-reference-panel.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  color: #374151;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.ai-panel-content .ai-section {
+  margin-bottom: 16px;
+}
+
+.ai-panel-content .ai-section:last-child {
+  margin-bottom: 0;
+}
+
+.ai-panel-content .section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.ai-panel-content .section-content {
+  color: #4b5563;
+  line-height: 1.6;
+  font-size: 12px;
+  padding: 10px 12px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.ai-panel-content .suggestion-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ai-panel-content .suggestion-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.ai-panel-content .suggestion-list li:last-child {
+  border-bottom: none;
+}
+
+.ai-panel-content .talking-points {
+  background: #f0f9ff;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.ai-panel-content .talking-box {
+  color: #0369a1;
+  line-height: 1.6;
+  font-size: 12px;
+}
+
+/* 学生信息展示（只读） */
+.student-info-display {
   margin-bottom: 20px;
   padding: 16px;
   background: #f8fafc;
@@ -1119,7 +1483,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
 }
 
 .profile-details .name {
@@ -1133,6 +1496,12 @@ onMounted(() => {
   color: #6b7280;
   font-weight: normal;
   margin-left: 8px;
+}
+
+.profile-details .class-info {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 4px;
 }
 
 .profile-details .warning-count {
@@ -1149,6 +1518,12 @@ onMounted(() => {
 
 .profile-details .no-warning {
   margin-top: 6px;
+}
+
+.profile-details .class-info {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 4px;
 }
 
 .warning-courses-list {
