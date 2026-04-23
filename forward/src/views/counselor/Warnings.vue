@@ -148,7 +148,6 @@
             <el-table-column label="学生" width="100">
               <template #default="{ row }">
                 <div class="student-cell">
-                  <el-avatar :size="28" :style="{ background: getAvatarColor(row.student?.name) }">{{ row.student?.name?.charAt(0) }}</el-avatar>
                   <span>{{ row.student?.name }}</span>
                 </div>
               </template>
@@ -353,9 +352,6 @@
     <el-dialog v-model="detailDialogVisible" title="预警详情" width="700px">
       <div v-if="selectedWarning" class="warning-detail">
         <div class="detail-header">
-          <el-avatar :size="64" :style="{ background: getAvatarColor(selectedWarning.student_name) }">
-            {{ selectedWarning.student_name?.charAt(0) }}
-          </el-avatar>
           <div class="detail-info">
             <h3>{{ selectedWarning.student_name }}</h3>
             <p>学号：{{ selectedWarning.student_no }} | 班级：{{ selectedWarning.class_name || '-' }}</p>
@@ -837,13 +833,6 @@ const copyTalkingPoints = () => {
 }
 
 // 工具函数
-const getAvatarColor = (name) => {
-  const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0']
-  let hash = 0
-  for (let i = 0; i < name?.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  return colors[Math.abs(hash) % colors.length]
-}
-
 const getRiskTagType = (level) => {
   const types = { high: 'danger', medium: 'warning', low: 'info', normal: 'success' }
   return types[level] || 'info'

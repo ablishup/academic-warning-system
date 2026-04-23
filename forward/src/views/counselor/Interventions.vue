@@ -124,9 +124,6 @@
           <el-table-column prop="student_name" label="学生姓名" width="100">
             <template #default="{ row }">
               <div class="student-name">
-                <el-avatar :size="32" :style="{ background: getAvatarColor(row.student_name) }">
-                  {{ row.student_name?.charAt(0) }}
-                </el-avatar>
                 <span>{{ row.student_name }}</span>
               </div>
             </template>
@@ -194,9 +191,6 @@
             <el-card class="timeline-card" shadow="hover">
               <div class="timeline-header">
                 <div class="student-info">
-                  <el-avatar :size="40" :style="{ background: getAvatarColor(item.student_name) }">
-                    {{ item.student_name?.charAt(0) }}
-                  </el-avatar>
                   <div class="info-text">
                     <div class="name">{{ item.student_name }}</div>
                     <div class="no">{{ item.student_no }}</div>
@@ -255,9 +249,6 @@
             <!-- 学生信息卡片（选择学生后显示） -->
           <div v-if="addForm.student_id && selectedStudentForDialog" class="student-info-display">
             <div class="student-profile-header">
-              <el-avatar :size="56" :style="{ background: getAvatarColor(selectedStudentForDialog.name) }">
-                {{ selectedStudentForDialog.name?.charAt(0) }}
-              </el-avatar>
               <div class="profile-details">
                 <div class="name">{{ selectedStudentForDialog.name }} <span class="student-no">{{ selectedStudentForDialog.student_no }}</span></div>
                 <div class="class-info" v-if="selectedStudentForDialog.class_name">{{ selectedStudentForDialog.class_name }}</div>
@@ -430,9 +421,6 @@
       <div v-if="selectedIntervention" class="detail-content">
         <div class="detail-header">
           <div class="student-info">
-            <el-avatar :size="64" :style="{ background: getAvatarColor(selectedIntervention.student_name) }">
-              {{ selectedIntervention.student_name?.charAt(0) }}
-            </el-avatar>
             <div class="info-text">
               <h3>{{ selectedIntervention.student_name }}</h3>
               <p>学号：{{ selectedIntervention.student_no }}</p>
@@ -1064,13 +1052,6 @@ const submitEvaluate = async () => {
 }
 
 // 工具函数
-const getAvatarColor = (name) => {
-  const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0']
-  let hash = 0
-  for (let i = 0; i < name?.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  return colors[Math.abs(hash) % colors.length]
-}
-
 const getRiskTagType = (level) => {
   const types = { high: 'danger', medium: 'warning', low: 'info', normal: 'success' }
   return types[level] || 'info'

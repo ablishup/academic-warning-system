@@ -40,9 +40,6 @@
         <el-table-column label="辅导员" min-width="150">
           <template #default="{ row }">
             <div class="counselor-info">
-              <el-avatar :size="40" :style="{ background: getAvatarColor(row.user?.first_name || row.user?.username) }">
-                {{ (row.user?.first_name || row.user?.username || '?').charAt(0) }}
-              </el-avatar>
               <div class="info-text">
                 <div class="name">{{ row.user?.first_name || row.user?.username }}</div>
                 <div class="username">{{ row.user?.username }}</div>
@@ -92,9 +89,6 @@
     <el-dialog v-model="detailDialogVisible" title="辅导员详情" width="600px">
       <div v-if="selectedCounselor" class="counselor-detail">
         <div class="detail-header">
-          <el-avatar :size="64" :style="{ background: getAvatarColor(selectedCounselor.user?.first_name) }">
-            {{ (selectedCounselor.user?.first_name || selectedCounselor.user?.username || '?').charAt(0) }}
-          </el-avatar>
           <div class="detail-info">
             <h3>{{ selectedCounselor.user?.first_name || selectedCounselor.user?.username }}</h3>
             <p>工号：{{ selectedCounselor.employee_no }}</p>
@@ -392,16 +386,6 @@ const confirmAssign = async () => {
   } catch (error) {
     ElMessage.error('分配失败')
   }
-}
-
-// 工具函数
-const getAvatarColor = (name) => {
-  const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0']
-  let hash = 0
-  for (let i = 0; i < (name?.length || 0); i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return colors[Math.abs(hash) % colors.length]
 }
 
 onMounted(() => {

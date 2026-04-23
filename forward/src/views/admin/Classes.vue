@@ -185,9 +185,6 @@
           <el-table-column label="学生" min-width="150">
             <template #default="{ row }">
               <div class="student-info">
-                <el-avatar :size="32" :style="{ background: getAvatarColor(row.name) }">
-                  {{ row.name?.charAt(0) }}
-                </el-avatar>
                 <div class="student-meta">
                   <div class="student-name">{{ row.name }}</div>
                   <div class="student-no">{{ row.student_no }}</div>
@@ -523,13 +520,6 @@ const deleteClass = async (row) => {
 }
 
 // 工具函数
-const getAvatarColor = (name) => {
-  const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0']
-  let hash = 0
-  for (let i = 0; i < name?.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  return colors[Math.abs(hash) % colors.length]
-}
-
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleDateString('zh-CN')

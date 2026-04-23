@@ -113,16 +113,7 @@
         :default-sort="{ prop: 'composite_score', order: 'ascending' }"
       >
         <el-table-column prop="student_no" label="学号" width="120" sortable />
-        <el-table-column prop="name" label="姓名" width="100">
-          <template #default="{ row }">
-            <div class="student-name">
-              <el-avatar :size="32" :style="{ background: getAvatarColor(row.name) }">
-                {{ row.name.charAt(0) }}
-              </el-avatar>
-              <span>{{ row.name }}</span>
-            </div>
-          </template>
-        </el-table-column>
+        <el-table-column prop="name" label="姓名" width="100" />
         <el-table-column prop="gender" label="性别" width="80" />
         <el-table-column prop="class_name" label="班级" width="180" />
         <el-table-column prop="composite_score" label="综合得分" width="120" sortable>
@@ -186,9 +177,6 @@
     >
       <div v-if="selectedStudent" class="student-detail">
         <div class="detail-header">
-          <el-avatar :size="64" :style="{ background: getAvatarColor(selectedStudent.name) }">
-            {{ selectedStudent.name.charAt(0) }}
-          </el-avatar>
           <div class="detail-info">
             <h3>{{ selectedStudent.name }}</h3>
             <p>学号：{{ selectedStudent.student_no }} | 班级：{{ selectedStudent.class_name }}</p>
@@ -378,15 +366,6 @@ const goBack = () => {
   router.push('/teacher/dashboard')
 }
 
-// 获取头像颜色
-const getAvatarColor = (name) => {
-  const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0']
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return colors[Math.abs(hash) % colors.length]
-}
 
 // 预警类型映射
 const getWarningType = (level) => {

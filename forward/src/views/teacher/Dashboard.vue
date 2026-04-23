@@ -62,9 +62,9 @@
         <el-table-column prop="name" label="课程名称" min-width="200">
           <template #default="{ row }">
             <div class="course-name-cell">
-              <el-avatar :size="40" :style="{ background: getCourseColor(row.id) }">
+              <div class="course-icon" :style="{ background: getCourseColor(row.id) }">
                 <el-icon><Monitor /></el-icon>
-              </el-avatar>
+              </div>
               <div>
                 <div class="name">{{ row.name }}</div>
                 <div class="code">{{ row.course_no }}</div>
@@ -270,6 +270,17 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.course-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
 }
 
 .course-name-cell .name {

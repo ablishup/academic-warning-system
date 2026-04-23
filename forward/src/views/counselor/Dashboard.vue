@@ -131,12 +131,7 @@
       <el-table :data="recentStudentWarnings" v-loading="loading" stripe>
         <el-table-column label="学生姓名" width="100">
           <template #default="{ row }">
-            <div class="student-name">
-              <el-avatar :size="32" :style="{ background: getAvatarColor(row.student?.name) }">
-                {{ row.student?.name?.charAt(0) }}
-              </el-avatar>
-              <span>{{ row.student?.name }}</span>
-            </div>
+            <span>{{ row.student?.name }}</span>
           </template>
         </el-table-column>
         <el-table-column label="学号" width="120">
@@ -198,9 +193,6 @@
     <el-dialog v-model="detailDialogVisible" title="学生学情详情" width="800px">
       <div v-if="selectedStudent" class="student-detail">
         <div class="detail-header">
-          <el-avatar :size="64" :style="{ background: getAvatarColor(selectedStudent.student?.name) }">
-            {{ selectedStudent.student?.name?.charAt(0) }}
-          </el-avatar>
           <div class="detail-info">
             <h3>{{ selectedStudent.student?.name }}</h3>
             <p>学号：{{ selectedStudent.student?.student_no }} | 班级：{{ selectedStudent.student?.class_name || '-' }}</p>
@@ -545,12 +537,6 @@ const resolveWarning = async (row) => {
 }
 
 // 工具函数
-const getAvatarColor = (name) => {
-  const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0']
-  let hash = 0
-  for (let i = 0; i < name?.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  return colors[Math.abs(hash) % colors.length]
-}
 
 const getRiskTagType = (level) => {
   const types = { high: 'danger', medium: 'warning', low: 'info', normal: 'success' }

@@ -8,9 +8,6 @@
 
       <!-- 教师信息卡片 -->
       <div class="profile-card" v-if="teacherInfo">
-        <el-avatar :size="48" :style="{ background: '#3b82f6' }">
-          {{ teacherInfo.name?.charAt(0) || 'T' }}
-        </el-avatar>
         <div class="profile-info">
           <div class="profile-name">{{ teacherInfo.name || teacherInfo.username }}</div>
           <div class="profile-no">工号: {{ teacherInfo.teacher_no }}</div>
@@ -54,9 +51,6 @@
         <div class="header-right">
           <el-dropdown>
             <span class="user-info">
-              <el-avatar :size="32" :style="{ background: '#3b82f6' }">
-                {{ teacherInfo?.name?.charAt(0) || 'T' }}
-              </el-avatar>
               <span>{{ teacherInfo?.name || '教师' }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>

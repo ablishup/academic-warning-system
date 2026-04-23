@@ -111,7 +111,6 @@
         <el-table-column label="学生" min-width="150">
           <template #default="{ row }">
             <div class="student-cell">
-              <el-avatar :size="32" :icon="UserFilled" />
               <div class="student-info">
                 <div class="name">{{ row.student_name }}</div>
                 <div class="no">{{ row.student_no }}</div>
@@ -195,7 +194,6 @@
       <div v-if="currentComment" class="comment-detail">
         <!-- 学生信息 -->
         <div class="student-header">
-          <el-avatar :size="48" :icon="UserFilled" />
           <div class="student-info">
             <h3>{{ currentComment.student_name }}</h3>
             <p>{{ currentComment.student_no }} | {{ currentComment.class_name || '未知班级' }}</p>

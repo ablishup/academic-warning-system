@@ -35,7 +35,6 @@
         <div class="header-right">
           <el-dropdown>
             <span class="user-info">
-              <el-avatar :size="32" :icon="UserFilled" />
               <span>学生</span>
               <el-icon><ArrowDown /></el-icon>
             </span>

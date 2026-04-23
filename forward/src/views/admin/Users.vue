@@ -56,9 +56,6 @@
         <el-table-column label="用户" min-width="180">
           <template #default="{ row }">
             <div class="user-info">
-              <el-avatar :size="40" :style="{ background: getAvatarColor(row.username) }">
-                {{ row.username?.charAt(0).toUpperCase() }}
-              </el-avatar>
               <div class="user-meta">
                 <div class="username">{{ row.username }}</div>
                 <div class="name" v-if="row.first_name || row.last_name">
@@ -434,13 +431,6 @@ const handleDeleteUser = async (row) => {
 }
 
 // 工具函数
-const getAvatarColor = (name) => {
-  const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0']
-  let hash = 0
-  for (let i = 0; i < name?.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  return colors[Math.abs(hash) % colors.length]
-}
-
 const getRoleTagType = (role) => {
   const types = { student: '', teacher: 'success', counselor: 'warning', admin: 'danger' }
   return types[role] || ''
