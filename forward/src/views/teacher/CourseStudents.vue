@@ -74,6 +74,20 @@
             学生名单
           </span>
           <div class="header-actions">
+            <el-select
+              v-model="selectedClass"
+              placeholder="全部班级"
+              clearable
+              style="width: 180px"
+              @change="handleClassChange"
+            >
+              <el-option
+                v-for="cls in classOptions"
+                :key="cls.id"
+                :label="`${cls.name} (${cls.student_count}人)`"
+                :value="cls.id"
+              />
+            </el-select>
             <el-input
               v-model="searchQuery"
               placeholder="搜索学生姓名或学号"
@@ -96,9 +110,9 @@
         :data="filteredStudents"
         v-loading="loading"
         style="width: 100%"
-        :default-sort="{ prop: 'warningLevel', order: 'descending' }"
+        :default-sort="{ prop: 'composite_score', order: 'ascending' }"
       >
-        <el-table-column prop="studentNo" label="学号" width="120" sortable />
+        <el-table-column prop="student_no" label="学号" width="120" sortable />
         <el-table-column prop="name" label="姓名" width="100">
           <template #default="{ row }">
             <div class="student-name">
@@ -110,36 +124,39 @@
           </template>
         </el-table-column>
         <el-table-column prop="gender" label="性别" width="80" />
-        <el-table-column prop="className" label="班级" width="150" />
-        <el-table-column prop="avgScore" label="平均成绩" width="120" sortable>
+        <el-table-column prop="class_name" label="班级" width="180" />
+        <el-table-column prop="composite_score" label="综合得分" width="120" sortable>
           <template #default="{ row }">
             <el-progress
-              :percentage="Math.round(row.avgScore)"
-              :status="row.avgScore >= 60 ? 'success' : 'exception'"
+              :percentage="Math.round(row.composite_score)"
+              :status="row.composite_score >= 60 ? 'success' : 'exception'"
               :stroke-width="6"
             />
           </template>
         </el-table-column>
-        <el-table-column prop="attendanceRate" label="出勤率" width="100">
+        <el-table-column prop="learning_stats.avg_progress" label="视频进度" width="100">
           <template #default="{ row }">
-            <span :class="getAttendanceClass(row.attendanceRate)">
-              {{ row.attendanceRate }}%
-            </span>
+            <span>{{ row.learning_stats?.avg_progress || 0 }}%</span>
           </template>
         </el-table-column>
-        <el-table-column prop="videoProgress" label="视频进度" width="100">
+        <el-table-column prop="homework_stats.avg_score" label="作业均分" width="100">
           <template #default="{ row }">
-            <span>{{ row.videoProgress }}%</span>
+            <span>{{ row.homework_stats?.avg_score || 0 }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="warningLevel" label="预警等级" width="100" sortable>
+        <el-table-column prop="exam_stats.avg_score" label="考试均分" width="100">
+          <template #default="{ row }">
+            <span>{{ row.exam_stats?.avg_score || 0 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="warning_level" label="预警等级" width="100" sortable>
           <template #default="{ row }">
             <el-tag
-              :type="getWarningType(row.warningLevel)"
+              :type="getWarningType(row.warning_level)"
               effect="dark"
               size="small"
             >
-              {{ getWarningLabel(row.warningLevel) }}
+              {{ getWarningLabel(row.warning_level) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -174,14 +191,14 @@
           </el-avatar>
           <div class="detail-info">
             <h3>{{ selectedStudent.name }}</h3>
-            <p>学号：{{ selectedStudent.studentNo }} | 班级：{{ selectedStudent.className }}</p>
+            <p>学号：{{ selectedStudent.student_no }} | 班级：{{ selectedStudent.class_name }}</p>
           </div>
           <el-tag
-            :type="getWarningType(selectedStudent.warningLevel)"
+            :type="getWarningType(selectedStudent.warning_level)"
             effect="dark"
             size="large"
           >
-            {{ getWarningLabel(selectedStudent.warningLevel) }}
+            {{ getWarningLabel(selectedStudent.warning_level) }}
           </el-tag>
         </div>
 
@@ -190,24 +207,22 @@
         <el-row :gutter="20" class="detail-stats">
           <el-col :span="8">
             <div class="detail-stat-item">
-              <div class="stat-label">平均成绩</div>
-              <div class="stat-value" :class="selectedStudent.avgScore >= 60 ? 'success' : 'danger'">
-                {{ selectedStudent.avgScore }}
-              </div>
-            </div>
-          </el-col>
-          <el-col :span="8">
-            <div class="detail-stat-item">
-              <div class="stat-label">出勤率</div>
-              <div class="stat-value" :class="getAttendanceClass(selectedStudent.attendanceRate)">
-                {{ selectedStudent.attendanceRate }}%
+              <div class="stat-label">综合得分</div>
+              <div class="stat-value" :class="selectedStudent.composite_score >= 60 ? 'success' : 'danger'">
+                {{ selectedStudent.composite_score?.toFixed(1) }}
               </div>
             </div>
           </el-col>
           <el-col :span="8">
             <div class="detail-stat-item">
               <div class="stat-label">视频进度</div>
-              <div class="stat-value">{{ selectedStudent.videoProgress }}%</div>
+              <div class="stat-value">{{ selectedStudent.learning_stats?.avg_progress || 0 }}%</div>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="detail-stat-item">
+              <div class="stat-label">作业均分</div>
+              <div class="stat-value">{{ selectedStudent.homework_stats?.avg_score || 0 }}</div>
             </div>
           </el-col>
         </el-row>
@@ -215,8 +230,13 @@
         <el-divider />
 
         <div class="detail-section">
-          <h4>学习趋势</h4>
-          <div ref="trendChartRef" style="height: 200px"></div>
+          <h4>学习统计</h4>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="学习活动数">{{ selectedStudent.learning_stats?.activity_count || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="学习时长">{{ selectedStudent.learning_stats?.total_duration || 0 }}分钟</el-descriptions-item>
+            <el-descriptions-item label="作业提交">{{ selectedStudent.homework_stats?.submit_count || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="考试次数">{{ selectedStudent.exam_stats?.exam_count || 0 }}</el-descriptions-item>
+          </el-descriptions>
         </div>
       </div>
     </el-dialog>
@@ -256,14 +276,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import * as echarts from 'echarts'
 import {
   ArrowLeft, User, Warning, CircleCheck, CircleClose,
   List, Search, Refresh, View, Message, Upload
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getCourseStudents } from '@/api/teacher'
 
 const route = useRoute()
 const router = useRouter()
@@ -273,55 +293,92 @@ const courseId = computed(() => route.params.courseId)
 const loading = ref(false)
 const uploading = ref(false)
 const searchQuery = ref('')
+const selectedClass = ref(null)
 const detailDialogVisible = ref(false)
 const showUploadDialog = ref(false)
 const selectedStudent = ref(null)
-const trendChartRef = ref(null)
-const courseName = ref('数据结构')
+const courseName = ref('')
 
-// 统计数据
+// 数据
+const students = ref([])
+const classOptions = ref([])
 const stats = ref({
-  totalStudents: 45,
-  normalStudents: 32,
-  warningStudents: 10,
-  criticalStudents: 3
+  totalStudents: 0,
+  normalStudents: 0,
+  warningStudents: 0,
+  criticalStudents: 0
 })
-
-// 学生列表数据（模拟）
-const students = ref([
-  { id: 1, studentNo: '2021001', name: '张三', gender: '男', className: '计算机2101', avgScore: 85, attendanceRate: 95, videoProgress: 88, warningLevel: 0 },
-  { id: 2, studentNo: '2021002', name: '李四', gender: '女', className: '计算机2101', avgScore: 78, attendanceRate: 88, videoProgress: 75, warningLevel: 0 },
-  { id: 3, studentNo: '2021003', name: '王五', gender: '男', className: '计算机2101', avgScore: 45, attendanceRate: 65, videoProgress: 40, warningLevel: 2 },
-  { id: 4, studentNo: '2021004', name: '赵六', gender: '女', className: '计算机2101', avgScore: 92, attendanceRate: 98, videoProgress: 95, warningLevel: 0 },
-  { id: 5, studentNo: '2021005', name: '钱七', gender: '男', className: '计算机2101', avgScore: 55, attendanceRate: 70, videoProgress: 60, warningLevel: 1 },
-  { id: 6, studentNo: '2021006', name: '孙八', gender: '女', className: '计算机2101', avgScore: 38, attendanceRate: 55, videoProgress: 35, warningLevel: 2 },
-  { id: 7, studentNo: '2021007', name: '周九', gender: '男', className: '计算机2101', avgScore: 72, attendanceRate: 82, videoProgress: 70, warningLevel: 0 },
-  { id: 8, studentNo: '2021008', name: '吴十', gender: '女', className: '计算机2101', avgScore: 68, attendanceRate: 78, videoProgress: 65, warningLevel: 1 },
-])
 
 // 过滤后的学生列表
 const filteredStudents = computed(() => {
-  if (!searchQuery.value) return students.value
-  const query = searchQuery.value.toLowerCase()
-  return students.value.filter(s =>
-    s.name.toLowerCase().includes(query) ||
-    s.studentNo.includes(query)
-  )
+  let result = students.value
+
+  // 搜索过滤
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    result = result.filter(s =>
+      s.name.toLowerCase().includes(query) ||
+      s.student_no.includes(query)
+    )
+  }
+
+  return result
 })
 
-// 方法
+// 加载数据
+const loadData = async () => {
+  loading.value = true
+  try {
+    const params = {}
+    if (selectedClass.value) {
+      params.class_id = selectedClass.value
+    }
+
+    const res = await getCourseStudents(courseId.value, params)
+    if (res.code === 200) {
+      const data = res.data
+      courseName.value = data.course.name
+      students.value = data.students || []
+      classOptions.value = data.classes || []
+
+      // 计算统计
+      const total = students.value.length
+      const critical = students.value.filter(s => s.warning_level === 'high').length
+      const warning = students.value.filter(s => s.warning_level === 'medium').length
+      const normal = total - critical - warning
+
+      stats.value = {
+        totalStudents: total,
+        normalStudents: normal,
+        warningStudents: warning,
+        criticalStudents: critical
+      }
+    }
+  } catch (error) {
+    console.error('加载数据失败:', error)
+    ElMessage.error('加载数据失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 班级筛选变化
+const handleClassChange = () => {
+  loadData()
+}
+
+// 刷新数据
+const refreshData = () => {
+  loadData()
+  ElMessage.success('数据已刷新')
+}
+
+// 返回
 const goBack = () => {
   router.push('/teacher/dashboard')
 }
 
-const refreshData = () => {
-  loading.value = true
-  setTimeout(() => {
-    loading.value = false
-    ElMessage.success('数据已刷新')
-  }, 500)
-}
-
+// 获取头像颜色
 const getAvatarColor = (name) => {
   const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#30cfd0']
   let hash = 0
@@ -331,71 +388,35 @@ const getAvatarColor = (name) => {
   return colors[Math.abs(hash) % colors.length]
 }
 
+// 预警类型映射
 const getWarningType = (level) => {
-  const types = ['success', 'warning', 'danger']
-  return types[level] || 'info'
+  const types = {
+    'high': 'danger',
+    'medium': 'warning',
+    'low': 'info',
+    null: 'success'
+  }
+  return types[level] || 'success'
 }
 
+// 预警标签映射
 const getWarningLabel = (level) => {
-  const labels = ['正常', '预警', '高危']
-  return labels[level] || '未知'
+  const labels = {
+    'high': '高危',
+    'medium': '预警',
+    'low': '低危',
+    null: '正常'
+  }
+  return labels[level] || '正常'
 }
 
-const getAttendanceClass = (rate) => {
-  if (rate >= 90) return 'success'
-  if (rate >= 70) return 'warning'
-  return 'danger'
-}
-
-const viewDetail = async (student) => {
+// 查看详情
+const viewDetail = (student) => {
   selectedStudent.value = student
   detailDialogVisible.value = true
-  await nextTick()
-  initTrendChart()
 }
 
-const initTrendChart = () => {
-  if (!trendChartRef.value) return
-  const chart = echarts.init(trendChartRef.value)
-  const option = {
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: {
-      type: 'category',
-      data: ['第1周', '第2周', '第3周', '第4周', '第5周', '第6周', '第7周', '第8周'],
-      axisLine: { lineStyle: { color: '#e0e0e0' } },
-      axisLabel: { color: '#666' }
-    },
-    yAxis: {
-      type: 'value',
-      min: 0,
-      max: 100,
-      axisLine: { show: false },
-      splitLine: { lineStyle: { color: '#f0f0f0' } },
-      axisLabel: { color: '#666' }
-    },
-    series: [{
-      data: [75, 78, 72, 80, 76, 82, 79, 85],
-      type: 'line',
-      smooth: true,
-      symbol: 'circle',
-      symbolSize: 8,
-      itemStyle: { color: '#667eea' },
-      lineStyle: { width: 3 },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0, y: 0, x2: 0, y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(102, 126, 234, 0.3)' },
-            { offset: 1, color: 'rgba(102, 126, 234, 0.05)' }
-          ]
-        }
-      }
-    }]
-  }
-  chart.setOption(option)
-}
-
+// 发送提醒
 const sendReminder = (student) => {
   ElMessageBox.confirm(
     `确定向 ${student.name} 发送学习提醒吗？`,
@@ -406,6 +427,7 @@ const sendReminder = (student) => {
   })
 }
 
+// 文件上传
 const handleFileChange = (file) => {
   console.log('Selected file:', file)
 }
@@ -420,7 +442,7 @@ const confirmUpload = () => {
 }
 
 onMounted(() => {
-  refreshData()
+  loadData()
 })
 </script>
 

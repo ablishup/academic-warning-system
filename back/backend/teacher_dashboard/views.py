@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from classes.models import Student
+from classes.models import Student, Class
 from courses.models import Course, CourseEnrollment
 from learning.models import (
     LearningActivity, HomeworkAssignment, HomeworkSubmission,
@@ -21,9 +21,15 @@ class TeacherCourseListView(APIView):
 
     def get(self, request):
         """获取当前教师教授的课程列表"""
-        # 从用户信息获取教师ID
-        # 假设request.user.id对应teacher_id
-        teacher_id = request.user.id
+        # 从用户信息获取教师对象
+        try:
+            teacher = request.user.teacher_profile
+            teacher_id = teacher.id
+        except AttributeError:
+            return Response({
+                'code': 403,
+                'message': '当前用户不是教师'
+            }, status=status.HTTP_403_FORBIDDEN)
 
         courses = Course.objects.filter(teacher_id=teacher_id)
 
@@ -72,17 +78,44 @@ class TeacherCourseStudentsView(APIView):
                 'message': '课程不存在'
             }, status=status.HTTP_404_NOT_FOUND)
 
+        # 获取班级筛选参数
+        class_id = request.query_params.get('class_id')
+
         # 获取课程的所有学生
         enrollments = CourseEnrollment.objects.filter(
             course_id=course_id
         )
 
-        data = []
+        # 收集学生ID和班级ID用于后续查询
+        student_ids = []
+        class_ids = set()
+        enrollment_map = {}
+
         for enrollment in enrollments:
-            # 查询学生信息
-            try:
-                student = Student.objects.get(id=enrollment.student_id)
-            except Student.DoesNotExist:
+            student_ids.append(enrollment.student_id)
+            enrollment_map[enrollment.student_id] = enrollment
+
+        # 获取学生信息
+        students_query = Student.objects.filter(id__in=student_ids)
+
+        # 应用班级筛选
+        if class_id:
+            students_query = students_query.filter(class_id=class_id)
+
+        # 获取班级信息映射
+        for student in students_query:
+            if student.class_id:
+                class_ids.add(student.class_id)
+
+        classes_map = {}
+        if class_ids:
+            for cls in Class.objects.filter(id__in=class_ids):
+                classes_map[cls.id] = cls.name
+
+        data = []
+        for student in students_query:
+            enrollment = enrollment_map.get(student.id)
+            if not enrollment:
                 continue
 
             # 计算学习活动统计
@@ -127,11 +160,16 @@ class TeacherCourseStudentsView(APIView):
                 exam_stats['avg_score'] or 0
             )
 
+            # 性别转换
+            gender_map = {0: '未知', 1: '男', 2: '女'}
+
             data.append({
                 'id': student.id,
                 'student_no': student.student_no,
                 'name': student.name,
-                'gender': student.gender,
+                'gender': gender_map.get(student.gender, '未知'),
+                'class_id': student.class_id,
+                'class_name': classes_map.get(student.class_id, '未分配'),
                 'enroll_time': enrollment.enroll_time,
                 'learning_stats': {
                     'activity_count': activity_stats['activity_count'],
@@ -154,6 +192,17 @@ class TeacherCourseStudentsView(APIView):
         # 按综合得分排序（低分在前，预警优先）
         data.sort(key=lambda x: (x['composite_score'], x['warning_level'] or ''))
 
+        # 构建班级列表（用于前端筛选下拉框）
+        class_list = []
+        for cid, cname in classes_map.items():
+            # 计算每个班级的学生数
+            count = sum(1 for s in data if s['class_id'] == cid)
+            class_list.append({
+                'id': cid,
+                'name': cname,
+                'student_count': count
+            })
+
         return Response({
             'code': 200,
             'message': '获取成功',
@@ -164,6 +213,7 @@ class TeacherCourseStudentsView(APIView):
                     'course_no': course.course_no,
                     'student_count': len(data),
                 },
+                'classes': class_list,
                 'students': data
             }
         })

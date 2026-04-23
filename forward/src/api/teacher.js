@@ -19,11 +19,13 @@ export function getTeacherCourses() {
 /**
  * 获取课程学生列表
  * @param {number} courseId - 课程ID
+ * @param {Object} params - 查询参数 {class_id}
  */
-export function getCourseStudents(courseId) {
+export function getCourseStudents(courseId, params = {}) {
     return request({
         url: `/teacher/courses/${courseId}/students/`,
-        method: 'get'
+        method: 'get',
+        params
     })
 }
 
