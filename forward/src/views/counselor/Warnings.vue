@@ -275,7 +275,7 @@
               </div>
 
               <!-- 问题分析 -->
-              <div class="ai-section">
+              <div class="ai-section" v-if="aiComment.analysis">
                 <h4 class="section-title">
                   <el-icon><TrendCharts /></el-icon>
                   问题分析
@@ -298,7 +298,7 @@
               </div>
 
               <!-- 行动计划 -->
-              <div class="ai-section">
+              <div class="ai-section" v-if="aiComment.action_plan">
                 <h4 class="section-title">
                   <el-icon><Calendar /></el-icon>
                   行动计划
