@@ -273,15 +273,14 @@
               </div>
             </div>
 
-            <!-- 预警课程列表 -->
+            <!-- 预警课程列表（仅展示） -->
             <div v-if="dialogStudentWarnings.length > 0" class="warning-courses-list">
-              <div class="section-title">选择要干预的课程（点击选择）：</div>
+              <div class="section-title">该学生的预警课程：</div>
               <div class="course-cards">
                 <div
                   v-for="w in dialogStudentWarnings"
                   :key="w.id"
-                  :class="['course-card', { active: addForm.warning_id === w.id }]"
-                  @click="selectWarningCourse(w.id)"
+                  class="course-card"
                 >
                   <div class="course-header">
                     <span class="course-name">{{ w.course?.name || w.course_name }}</span>
