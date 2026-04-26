@@ -292,11 +292,13 @@ class FeatureEngineering:
         Returns:
             str: 风险等级 (high, medium, low, normal)
         """
-        if score < 60:
+        # 阈值基于2026-04-27导入的真实数据分布 (mean=74, max=85)
+        # score < 65: ~5%高危, score 65-75: ~35%中危, score 75-80: ~45%低危, score >= 80: ~15%正常
+        if score < 65:
             return 'high'  # 红色预警
         elif score < 75:
             return 'medium'  # 橙色预警
-        elif score < 85:
+        elif score < 80:
             return 'low'  # 黄色预警
         else:
             return 'normal'  # 正常
