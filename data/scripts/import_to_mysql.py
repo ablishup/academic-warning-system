@@ -20,6 +20,12 @@ from pathlib import Path
 import json
 from datetime import datetime
 import numpy as np
+import os
+from dotenv import load_dotenv
+
+# 加载 .env（脚本在 data/scripts/，.env 在 back/backend/.env）
+_env_path = Path(__file__).parent.parent.parent / 'back' / 'backend' / '.env'
+load_dotenv(dotenv_path=_env_path)
 
 # ==================== 配置区域 ====================
 
@@ -27,7 +33,7 @@ DB_CONFIG = {
     'host': 'localhost',
     'port': 3306,
     'user': 'root',
-    'password': 'YYXyyx204821',
+    'password': os.environ.get('DB_PASSWORD', ''),
     'database': 'academic_warning_system',
     'charset': 'utf8mb4'
 }
@@ -229,7 +235,8 @@ def import_course_enrollments(conn):
                 if isinstance(enroll_time, str):
                     try:
                         enroll_time = datetime.strptime(enroll_time, '%Y-%m-%d')
-                    except:
+                    except Exception as e:
+                        print(f"  日期解析失败(enroll_time={enroll_time}): {e}")
                         enroll_time = datetime.now()
 
             cursor.execute(sql, (
@@ -411,7 +418,8 @@ def import_homework_data(conn):
                 score_val = row.get('score', 0)
                 try:
                     score = float(score_val) if pd.notna(score_val) else 0
-                except:
+                except Exception as e:
+                    print(f"  分数转换失败(score={score_val}): {e}")
                     score = 0
 
                 sql = """
@@ -430,8 +438,8 @@ def import_homework_data(conn):
                         int(row.get('is_late', 0)) if pd.notna(row.get('is_late')) else 0
                     ))
                     total_sub += 1
-                except:
-                    pass
+                except Exception as e:
+                    print(f"  作业提交SQL执行失败: {e}")
 
         conn.commit()
         print(f"  成功导入 {total_sub} 条作业提交记录")
@@ -511,7 +519,8 @@ def import_exam_data(conn):
             score_val = row.get('score', 0)
             try:
                 score = float(score_val) if pd.notna(score_val) else 0
-            except:
+            except Exception as e:
+                print(f"  考试分数转换失败(score={score_val}): {e}")
                 score = 0
 
             sql = """
@@ -529,8 +538,8 @@ def import_exam_data(conn):
                     row.get('submit_time')
                 ))
                 total_results += 1
-            except:
-                pass
+            except Exception as e:
+                print(f"  考试成绩SQL执行失败: {e}")
 
         conn.commit()
         print(f"  成功导入 {total_results} 条考试结果")
