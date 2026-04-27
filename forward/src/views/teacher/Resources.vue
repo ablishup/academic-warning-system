@@ -456,7 +456,8 @@ const confirmUpload = async () => {
 const downloadResource = (resource) => {
   try {
     // 使用 window.open 下载文件
-    const url = `http://localhost:8000/api/courses/resources/${resource.id}/download/`
+    const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+    const url = `${base}/courses/resources/${resource.id}/download/`
     window.open(url, '_blank')
     ElMessage.success('开始下载')
   } catch (error) {

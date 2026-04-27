@@ -12,7 +12,7 @@ function getCSRFToken() {
 
 // 创建axios实例
 const request = axios.create({
-    baseURL: 'http://localhost:8000/api',
+    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
     timeout: 10000,
     withCredentials: true,  // 允许携带cookie（Session认证）
     headers: {

@@ -30,7 +30,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -191,11 +191,7 @@ SIMPLE_JWT = {
 }
 
 # CORS配置
-CORS_ALLOW_ALL_ORIGINS = True  # 开发环境允许所有跨域
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL', 'True').lower() == 'true'
 CORS_ALLOW_CREDENTIALS = True
-
-# 如需限制特定域名，使用以下配置：
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:8080",
-#     "http://127.0.0.1:8080",
-# ]
+if not CORS_ALLOW_ALL_ORIGINS:
+    CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:8080').split(',')

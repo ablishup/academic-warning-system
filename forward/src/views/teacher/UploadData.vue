@@ -156,7 +156,7 @@ const uploading = ref({
   exams: false
 })
 
-const uploadUrl = 'http://localhost:8000/api/import/activities/'
+const uploadUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/import/activities/`
 
 // 加载教师课程列表
 const loadCourses = async () => {
