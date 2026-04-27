@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from classes.models import Student
+from users.utils import get_student_from_user
 from courses.models import Course
 from algorithm.warning_predictor import WarningPredictor
 from algorithm.features import FeatureEngineering
@@ -22,11 +23,6 @@ from .serializers import (
 )
 from .data_sync import DataSynchronizer
 
-
-def get_student_from_user(user):
-    """从当前登录用户获取学生ID"""
-    if not user or not user.is_authenticated:
-        return None
 
     # 方法1: 通过 username 匹配 student_no（学号）
     student = Student.objects.filter(student_no=user.username).first()

@@ -227,12 +227,8 @@ def teacher_courses_view(request):
     })
 
 
-def get_student_from_user(user):
-    """从当前登录用户获取学生ID"""
-    if not user or not user.is_authenticated:
-        return None
-
     from classes.models import Student
+from users.utils import get_student_from_user
 
     # 方法1: 通过 username 匹配 student_no（学号）
     student = Student.objects.filter(student_no=user.username).first()
