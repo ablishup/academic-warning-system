@@ -115,22 +115,8 @@ class WarningRecordListView(generics.ListAPIView):
         return queryset.select_related('student', 'course')
 
     def _get_counselor_student_ids(self, user):
-        """获取辅导员管理班级的所有学生ID"""
-        from classes.models import Student, Class
-
-        # 获取辅导员的ID（在users表中的ID）
-        counselor_user_id = user.id
-
-        # 查找该辅导员管理的班级
-        managed_classes = Class.objects.filter(counselor_id=counselor_user_id)
-        class_ids = [c.id for c in managed_classes]
-
-        if not class_ids:
-            return []
-
-        # 获取这些班级的所有学生
-        students = Student.objects.filter(class_id__in=class_ids)
-        return [s.id for s in students]
+        from users.utils import get_counselor_student_ids
+        return get_counselor_student_ids(user)
 
 
 class WarningRecordDetailView(generics.RetrieveAPIView):
@@ -364,22 +350,8 @@ class WarningStatsView(APIView):
         return False
 
     def _get_counselor_student_ids(self, user):
-        """获取辅导员管理班级的所有学生ID"""
-        from classes.models import Student, Class
-
-        # 获取辅导员的ID（在users表中的ID）
-        counselor_user_id = user.id
-
-        # 查找该辅导员管理的班级
-        managed_classes = Class.objects.filter(counselor_id=counselor_user_id)
-        class_ids = [c.id for c in managed_classes]
-
-        if not class_ids:
-            return []
-
-        # 获取这些班级的所有学生
-        students = Student.objects.filter(class_id__in=class_ids)
-        return [s.id for s in students]
+        from users.utils import get_counselor_student_ids
+        return get_counselor_student_ids(user)
 
 
 class StudentCourseScoreListView(generics.ListAPIView):

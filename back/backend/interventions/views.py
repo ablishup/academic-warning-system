@@ -70,18 +70,8 @@ class InterventionRecordListView(generics.ListAPIView):
         return False
 
     def _get_counselor_student_ids(self, user):
-        """获取辅导员管理班级的所有学生ID"""
-        from classes.models import Student, Class
-
-        counselor_user_id = user.id
-        managed_classes = Class.objects.filter(counselor_id=counselor_user_id)
-        class_ids = [c.id for c in managed_classes]
-
-        if not class_ids:
-            return []
-
-        students = Student.objects.filter(class_id__in=class_ids)
-        return [s.id for s in students]
+        from users.utils import get_counselor_student_ids
+        return get_counselor_student_ids(user)
 
 
 class InterventionRecordDetailView(generics.RetrieveAPIView):
@@ -294,18 +284,8 @@ class InterventionStatsView(APIView):
         return False
 
     def _get_counselor_student_ids(self, user):
-        """获取辅导员管理班级的所有学生ID"""
-        from classes.models import Student, Class
-
-        counselor_user_id = user.id
-        managed_classes = Class.objects.filter(counselor_id=counselor_user_id)
-        class_ids = [c.id for c in managed_classes]
-
-        if not class_ids:
-            return []
-
-        students = Student.objects.filter(class_id__in=class_ids)
-        return [s.id for s in students]
+        from users.utils import get_counselor_student_ids
+        return get_counselor_student_ids(user)
 
 
 class StudentInterventionSummaryView(APIView):
