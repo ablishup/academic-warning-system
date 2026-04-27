@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || '')
+  const refreshToken = ref(localStorage.getItem('refreshToken') || '')
   const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || 'null'))
 
   const isLoggedIn = computed(() => !!token.value || !!userInfo.value)
@@ -13,23 +14,28 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => role.value === 'admin')
 
   function login(data) {
-    // data 来自后端 login 响应: { user: {...}, token?: '...' }
+    // JWT: data = { user: {...}, access: '...', refresh: '...' }
+    // 兼容旧格式: data = { role:..., username:... }
     const user = data.user || data
     userInfo.value = user
     localStorage.setItem('userInfo', JSON.stringify(user))
 
-    // 后端可能返回 token (JWT) 也可能不返回 (纯 Session)
-    // 若返回则单独存储供 request.js 拦截器使用
-    if (data.token) {
-      token.value = data.token
-      localStorage.setItem('token', data.token)
+    if (data.access) {
+      token.value = data.access
+      localStorage.setItem('token', data.access)
+    }
+    if (data.refresh) {
+      refreshToken.value = data.refresh
+      localStorage.setItem('refreshToken', data.refresh)
     }
   }
 
   function logout() {
     token.value = ''
+    refreshToken.value = ''
     userInfo.value = null
     localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
     localStorage.removeItem('userInfo')
     localStorage.removeItem('rememberedUsername')
   }

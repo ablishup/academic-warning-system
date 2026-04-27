@@ -195,8 +195,9 @@ const handleLogin = async () => {
 
         ElMessage.success('登录成功')
 
-        // 根据角色跳转
-        const role = res.data.role || 'student'
+        // 根据角色跳转（JWT 格式: res.data.user.role）
+        const user = res.data.user || res.data
+        const role = user.role || 'student'
         const redirectPath = roleRedirects[role] || '/student'
         router.push(redirectPath)
       } else {

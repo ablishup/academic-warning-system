@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
+from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Teacher, Counselor
 from .serializers import (
     UserSerializer, LoginSerializer, CreateUserSerializer,
@@ -27,10 +28,16 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
+            refresh = RefreshToken.for_user(user)
+            user_data = UserSerializer(user).data
             return Response({
                 'code': 200,
                 'message': '登录成功',
-                'data': UserSerializer(user).data
+                'data': {
+                    'user': user_data,
+                    'access': str(refresh.access_token),
+                    'refresh': str(refresh),
+                }
             })
         return Response({
             'code': 401,
