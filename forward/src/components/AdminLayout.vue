@@ -33,10 +33,6 @@
           <el-icon><School /></el-icon>
           <span>班级管理</span>
         </el-menu-item>
-        <el-menu-item index="/admin/system">
-          <el-icon><Tools /></el-icon>
-          <span>系统设置</span>
-        </el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>
@@ -66,7 +62,7 @@
 </template>
 
 <script setup>
-import { Setting, DataBoard, User, Reading, School, Tools, UserFilled, ArrowDown, FirstAidKit } from '@element-plus/icons-vue'
+import { Setting, DataBoard, User, Reading, School, UserFilled, ArrowDown, FirstAidKit } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
