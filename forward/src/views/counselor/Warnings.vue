@@ -531,9 +531,7 @@ const smsForm = reactive({
 const loadData = async () => {
   loading.value = true
   try {
-    console.log('正在加载按学生汇总的预警数据...')
     const res = await getWarningRecordsByStudent()
-    console.log('API响应:', res)
     if (res.code === 200) {
       // 直接使用后端返回的按学生汇总数据（已按风险排序）
       const studentList = res.data?.students || []
@@ -542,8 +540,6 @@ const loadData = async () => {
 
       // 更新分页总数
       pagination.total = studentList.length
-      console.log('学生预警汇总数据:', studentList)
-      console.log('总数:', pagination.total)
 
       // 如果有数据且未选择，默认选择第一条
       if (studentList.length > 0 && !selectedRow.value) {

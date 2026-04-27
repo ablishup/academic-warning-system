@@ -408,7 +408,6 @@ const sendReminder = (student) => {
 
 // 文件上传
 const handleFileChange = (file) => {
-  console.log('Selected file:', file)
 }
 
 const confirmUpload = () => {

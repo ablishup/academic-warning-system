@@ -56,11 +56,13 @@
 <script setup>
 import { School, DataAnalysis, Collection, FolderOpened, UserFilled, ArrowDown } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 const logout = () => {
-  localStorage.removeItem('userInfo')
+  authStore.logout()
   router.push('/login')
 }
 </script>

@@ -11,3 +11,9 @@ export * from './student'
 
 // 教师端API
 export * from './teacher'
+
+// 辅导员端API
+export * from './counselor'
+
+// 管理员端API
+export * from './admin'

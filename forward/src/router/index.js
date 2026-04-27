@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const routes = [
   {
@@ -134,6 +135,40 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// 角色→路径前缀映射
+const rolePrefixMap = {
+  student: '/student',
+  teacher: '/teacher',
+  counselor: '/counselor',
+  admin: '/admin'
+}
+
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore()
+
+  // 登录页直接放行
+  if (to.path === '/login') {
+    // 已登录则跳转对应首页
+    if (authStore.isLoggedIn && authStore.role) {
+      return next(authStore.getHomePath(authStore.role))
+    }
+    return next()
+  }
+
+  // 未登录 → 跳转登录页
+  if (!authStore.isLoggedIn) {
+    return next('/login')
+  }
+
+  // 角色越权拦截：检查路径前缀
+  const expectedPrefix = rolePrefixMap[authStore.role]
+  if (expectedPrefix && !to.path.startsWith(expectedPrefix)) {
+    return next(authStore.getHomePath(authStore.role))
+  }
+
+  next()
 })
 
 export default router

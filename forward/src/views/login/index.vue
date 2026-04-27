@@ -133,8 +133,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { School, User, Lock, DataAnalysis, Warning } from '@element-plus/icons-vue'
 import request from '@/api/request'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const loginFormRef = ref(null)
 const loading = ref(false)
 const rememberMe = ref(false)
@@ -181,8 +183,8 @@ const handleLogin = async () => {
       })
 
       if (res.code === 200) {
-        // 保存用户信息
-        localStorage.setItem('userInfo', JSON.stringify(res.data))
+        // 保存用户信息到 auth store
+        authStore.login(res.data)
 
         // 记住用户名
         if (rememberMe.value) {

@@ -103,12 +103,13 @@ const loadCounselorInfo = async () => {
     }
   } catch (error) {
     console.error('获取辅导员信息失败:', error)
-    // 如果API失败，使用本地存储的用户信息
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-    if (userInfo.role === 'counselor') {
+    // 如果API失败，使用 auth store 中的登录用户信息
+    const authStore = useAuthStore()
+    const user = authStore.userInfo
+    if (user && user.role === 'counselor') {
       counselorInfo.value = {
-        username: userInfo.username,
-        name: userInfo.name || userInfo.username,
+        username: user.username,
+        name: user.name || user.username,
         employee_no: '未设置',
         department: '未设置'
       }
@@ -121,7 +122,8 @@ const showProfile = () => {
 }
 
 const logout = () => {
-  localStorage.removeItem('userInfo')
+  const authStore = useAuthStore()
+  authStore.logout()
   router.push('/login')
 }
 
