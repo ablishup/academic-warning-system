@@ -11,6 +11,7 @@ from .serializers import (
     CourseSerializer, KnowledgePointSerializer, CourseListSerializer,
     CourseResourceSerializer, CourseResourceCreateSerializer
 )
+from users.utils import get_student_from_user
 
 
 class CourseResourceListCreateView(generics.ListCreateAPIView):
@@ -168,36 +169,110 @@ def course_resource_download_view(request, pk):
     return response
 
 
-@api_view(['GET'])
+# 状态映射
+COURSE_STATUS_MAP = {
+    'active': 1,
+    'pending': 0,
+    'ended': 2,
+}
+COURSE_STATUS_REVERSE = {v: k for k, v in COURSE_STATUS_MAP.items()}
+
+
+def _course_to_dict(course):
+    """将课程对象转为前端格式"""
+    return {
+        'id': course.id,
+        'name': course.name,
+        'code': course.course_no,
+        'description': course.description,
+        'credit': float(course.credit) if course.credit else 0,
+        'hours': course.hours,
+        'teacher_id': course.teacher_id,
+        'semester': course.semester,
+        'status': COURSE_STATUS_REVERSE.get(course.status, 'active'),
+        'student_count': CourseEnrollment.objects.filter(course_id=course.id).count(),
+        'created_at': course.created_at,
+    }
+
+
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def course_list_view(request):
-    """获取课程列表"""
-    courses = Course.objects.all()
-    serializer = CourseSerializer(courses, many=True)
-    return Response({
-        'code': 200,
-        'message': '获取成功',
-        'data': serializer.data
-    })
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def course_detail_view(request, pk):
-    """获取课程详情"""
-    try:
-        course = Course.objects.get(pk=pk)
-        serializer = CourseSerializer(course)
+    """获取课程列表 / 创建课程"""
+    if request.method == 'GET':
+        courses = Course.objects.all()
+        data = [_course_to_dict(c) for c in courses]
         return Response({
             'code': 200,
             'message': '获取成功',
-            'data': serializer.data
+            'data': data
         })
+    elif request.method == 'POST':
+        data = request.data
+        try:
+            course = Course.objects.create(
+                course_no=data.get('code', ''),
+                name=data.get('name', ''),
+                description=data.get('description', ''),
+                credit=data.get('credit', 2.0),
+                hours=data.get('hours', 48),
+                teacher_id=data.get('teacher_id'),
+                semester=data.get('semester', ''),
+                status=COURSE_STATUS_MAP.get(data.get('status'), 1),
+            )
+            return Response({
+                'code': 200,
+                'message': '创建成功',
+                'data': _course_to_dict(course)
+            })
+        except Exception as e:
+            return Response({
+                'code': 400,
+                'message': f'创建失败: {str(e)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def course_detail_view(request, pk):
+    """课程详情 / 更新 / 删除"""
+    try:
+        course = Course.objects.get(pk=pk)
     except Course.DoesNotExist:
         return Response({
             'code': 404,
             'message': '课程不存在'
         }, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        return Response({
+            'code': 200,
+            'message': '获取成功',
+            'data': _course_to_dict(course)
+        })
+    elif request.method in ('PUT', 'PATCH'):
+        data = request.data
+        course.course_no = data.get('code', course.course_no)
+        course.name = data.get('name', course.name)
+        course.description = data.get('description', course.description)
+        course.credit = data.get('credit', course.credit)
+        course.hours = data.get('hours', course.hours)
+        course.teacher_id = data.get('teacher_id', course.teacher_id)
+        course.semester = data.get('semester', course.semester)
+        if 'status' in data:
+            course.status = COURSE_STATUS_MAP.get(data['status'], course.status)
+        course.save()
+        return Response({
+            'code': 200,
+            'message': '更新成功',
+            'data': _course_to_dict(course)
+        })
+    elif request.method == 'DELETE':
+        course.delete()
+        return Response({
+            'code': 200,
+            'message': '删除成功'
+        })
 
 
 @api_view(['GET'])
@@ -227,43 +302,6 @@ def teacher_courses_view(request):
     })
 
 
-    from classes.models import Student
-from users.utils import get_student_from_user
-
-    # 方法1: 通过 username 匹配 student_no（学号）
-    student = Student.objects.filter(student_no=user.username).first()
-    if student:
-        return student.id
-
-    # 方法2: 通过 first_name 匹配 name（姓名）
-    if user.first_name:
-        student = Student.objects.filter(name=user.first_name).first()
-        if student:
-            return student.id
-
-    # 方法3: 兼容旧账号（student_1）
-    if user.username.startswith('student_'):
-        try:
-            student_id = int(user.username.split('_')[1])
-            student = Student.objects.filter(id=student_id).first()
-            if student:
-                return student.id
-        except (ValueError, IndexError):
-            pass
-
-    # 方法4: 通过 profile 关联 (如果存在)
-    try:
-        profile = getattr(user, 'profile', None)
-        if profile and hasattr(profile, 'employee_no') and profile.employee_no:
-            student = Student.objects.filter(student_no=profile.employee_no).first()
-            if student:
-                return student.id
-    except:
-        pass
-
-    return None
-
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def student_courses_view(request):
@@ -291,3 +329,74 @@ def student_courses_view(request):
         'message': '获取成功',
         'data': serializer.data
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def course_students_view(request, course_id):
+    """获取课程学生列表"""
+    from classes.models import Student
+    enrollments = CourseEnrollment.objects.filter(course_id=course_id)
+    student_ids = [e.student_id for e in enrollments]
+    students = Student.objects.filter(id__in=student_ids)
+    data = []
+    for s in students:
+        data.append({
+            'id': s.id,
+            'student_no': s.student_no,
+            'name': s.name,
+            'gender': s.gender,
+            'phone': s.phone or '',
+        })
+    return Response({
+        'code': 200,
+        'message': '获取成功',
+        'data': data
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def course_add_students_view(request, course_id):
+    """批量添加学生到课程"""
+    student_ids = request.data.get('student_ids', [])
+    if not student_ids:
+        return Response({
+            'code': 400,
+            'message': '请选择要添加的学生'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    created = 0
+    for sid in student_ids:
+        if not CourseEnrollment.objects.filter(student_id=sid, course_id=course_id).exists():
+            CourseEnrollment.objects.create(student_id=sid, course_id=course_id)
+            created += 1
+
+    return Response({
+        'code': 200,
+        'message': f'成功添加 {created} 名学生',
+        'data': {'created_count': created}
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def course_remove_student_view(request, course_id):
+    """从课程移除学生"""
+    student_id = request.data.get('student_id')
+    if not student_id:
+        return Response({
+            'code': 400,
+            'message': '请指定学生'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    deleted, _ = CourseEnrollment.objects.filter(student_id=student_id, course_id=course_id).delete()
+    if deleted:
+        return Response({
+            'code': 200,
+            'message': '移除成功'
+        })
+    return Response({
+        'code': 404,
+        'message': '该学生未选修此课程'
+    }, status=status.HTTP_404_NOT_FOUND)

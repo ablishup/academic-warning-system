@@ -87,6 +87,7 @@
 import { School, DataBoard, Warning, FirstAidKit, UserFilled, ArrowDown, OfficeBuilding, ChatDotRound } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { ref, onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import { getCurrentCounselorProfile } from '@/api/admin'
 import { ElMessage } from 'element-plus'
 

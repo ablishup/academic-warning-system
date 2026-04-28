@@ -28,11 +28,31 @@ class UserSerializer(serializers.ModelSerializer):
         return 'student'
 
     def get_student_no(self, obj):
-        # 从profile或额外字段获取学号/工号
-        return getattr(obj, 'student_no', '')
+        # 从关联扩展表按角色读取工号/学号
+        role = self.get_role(obj)
+        try:
+            if role == 'teacher' and hasattr(obj, 'teacher_profile'):
+                return obj.teacher_profile.teacher_no or ''
+            elif role == 'counselor' and hasattr(obj, 'counselor_profile'):
+                return obj.counselor_profile.employee_no or ''
+            elif role == 'student' and hasattr(obj, 'profile'):
+                return obj.profile.employee_no or ''
+        except Exception:
+            pass
+        return ''
 
     def get_phone(self, obj):
-        return getattr(obj, 'phone', '')
+        role = self.get_role(obj)
+        try:
+            if role == 'teacher' and hasattr(obj, 'teacher_profile'):
+                return obj.teacher_profile.phone or ''
+            elif role == 'counselor' and hasattr(obj, 'counselor_profile'):
+                return obj.counselor_profile.phone or ''
+            elif role == 'student' and hasattr(obj, 'profile'):
+                return obj.profile.phone or ''
+        except Exception:
+            pass
+        return ''
 
 
 class LoginSerializer(serializers.Serializer):
@@ -71,11 +91,26 @@ class CreateUserSerializer(serializers.ModelSerializer):
             is_active=validated_data.get('is_active', True)
         )
 
-        # 设置额外字段（需要扩展User模型或使用Profile）
-        # 这里先存储在user的自定义属性中
-        if student_no:
-            # 将学号/工号存储在last_name中，或使用自定义字段
-            pass
+        # 根据角色设置权限和分组，并同步创建扩展表记录
+        from users.models import UserProfile
+        if role == 'teacher':
+            Teacher.objects.create(
+                user=user,
+                teacher_no=student_no or '',
+                phone=phone or ''
+            )
+        elif role == 'counselor':
+            Counselor.objects.create(
+                user=user,
+                employee_no=student_no or '',
+                phone=phone or ''
+            )
+        elif role == 'student':
+            UserProfile.objects.create(
+                user=user,
+                employee_no=student_no or '',
+                phone=phone or ''
+            )
 
         # 根据角色设置权限和分组
         if role == 'admin':
@@ -127,15 +162,19 @@ class UpdateUserSerializer(serializers.ModelSerializer):
         choices=['student', 'teacher', 'counselor', 'admin'],
         required=False
     )
+    student_no = serializers.CharField(required=False, allow_blank=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
         fields = ['username', 'password', 'first_name', 'last_name', 'email',
-                  'role', 'is_active']
+                  'role', 'student_no', 'phone', 'is_active']
 
     def update(self, instance, validated_data):
         role = validated_data.pop('role', None)
         password = validated_data.pop('password', None)
+        student_no = validated_data.pop('student_no', None)
+        phone = validated_data.pop('phone', None)
 
         # 更新基本信息
         for attr, value in validated_data.items():
@@ -159,6 +198,43 @@ class UpdateUserSerializer(serializers.ModelSerializer):
                 group, _ = Group.objects.get_or_create(name=role)
                 instance.groups.add(group)
             instance.save()
+
+        # 同步更新扩展表
+        from users.models import UserProfile
+        current_role = None
+        if role:
+            current_role = role
+        else:
+            if instance.is_superuser:
+                current_role = 'admin'
+            elif instance.groups.filter(name='teacher').exists():
+                current_role = 'teacher'
+            elif instance.groups.filter(name='counselor').exists():
+                current_role = 'counselor'
+            else:
+                current_role = 'student'
+
+        if current_role == 'teacher':
+            profile, _ = Teacher.objects.get_or_create(user=instance)
+            if student_no is not None:
+                profile.teacher_no = student_no
+            if phone is not None:
+                profile.phone = phone
+            profile.save()
+        elif current_role == 'counselor':
+            profile, _ = Counselor.objects.get_or_create(user=instance)
+            if student_no is not None:
+                profile.employee_no = student_no
+            if phone is not None:
+                profile.phone = phone
+            profile.save()
+        elif current_role == 'student':
+            profile, _ = UserProfile.objects.get_or_create(user=instance)
+            if student_no is not None:
+                profile.employee_no = student_no
+            if phone is not None:
+                profile.phone = phone
+            profile.save()
 
         return instance
 

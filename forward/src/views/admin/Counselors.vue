@@ -1,5 +1,5 @@
 <template>
-  <div class="counselors-page">
+  <div class="admin-page">
     <!-- 页面标题 -->
     <div class="page-header">
       <div class="header-left">
@@ -9,7 +9,7 @@
     </div>
 
     <!-- 筛选栏 -->
-    <el-card class="filter-card" shadow="never">
+    <el-card class="filter-card" shadow="hover">
       <el-form :model="filterForm" inline>
         <el-form-item label="院系">
           <el-select v-model="filterForm.department" placeholder="全部院系" clearable style="width: 180px">
@@ -17,12 +17,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="搜索">
-          <el-input
-            v-model="filterForm.search"
-            placeholder="姓名/工号"
-            clearable
-            style="width: 200px"
-          />
+          <el-input v-model="filterForm.search" placeholder="姓名/工号" clearable style="width: 200px" />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleFilter">
@@ -35,44 +30,38 @@
     </el-card>
 
     <!-- 辅导员列表 -->
-    <el-card class="counselors-card" shadow="never" v-loading="loading">
+    <el-card class="list-card" shadow="hover" v-loading="loading">
       <el-table :data="counselors" stripe>
         <el-table-column label="辅导员" min-width="150">
           <template #default="{ row }">
             <div class="counselor-info">
-              <div class="info-text">
-                <div class="name">{{ row.user?.first_name || row.user?.username }}</div>
-                <div class="username">{{ row.user?.username }}</div>
-              </div>
+              <div class="info-name">{{ row.user?.first_name || row.user?.username }}</div>
+              <div class="info-meta">{{ row.user?.username }}</div>
             </div>
           </template>
         </el-table-column>
         <el-table-column prop="employee_no" label="工号" width="120" />
-        <el-table-column prop="department" label="所属院系" min-width="150" />
+        <el-table-column prop="department" label="所属院系" min-width="150" show-overflow-tooltip />
         <el-table-column prop="phone" label="联系电话" width="130" />
         <el-table-column label="管理班级" width="100">
           <template #default="{ row }">
-            <el-tag type="primary" size="small">
-              {{ row.classCount || 0 }} 个
-            </el-tag>
+            <el-tag type="primary" size="small">{{ row.classCount || 0 }} 个</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="viewDetail(row)">
-              <el-icon><View /></el-icon>
-              详情
+              <el-icon><View /></el-icon>详情
             </el-button>
             <el-button type="success" link size="small" @click="manageClasses(row)">
-              <el-icon><School /></el-icon>
-              分配班级
+              <el-icon><School /></el-icon>分配班级
             </el-button>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 分页 -->
-      <div class="pagination-wrapper">
+      <div class="pagination-container">
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.pageSize"
@@ -94,8 +83,7 @@
             <p>工号：{{ selectedCounselor.employee_no }}</p>
           </div>
         </div>
-
-        <el-descriptions :column="2" border class="detail-descriptions">
+        <el-descriptions :column="2" border>
           <el-descriptions-item label="用户名">{{ selectedCounselor.user?.username }}</el-descriptions-item>
           <el-descriptions-item label="工号">{{ selectedCounselor.employee_no }}</el-descriptions-item>
           <el-descriptions-item label="院系">{{ selectedCounselor.department || '-' }}</el-descriptions-item>
@@ -103,17 +91,10 @@
           <el-descriptions-item label="邮箱">{{ selectedCounselor.user?.email || '-' }}</el-descriptions-item>
           <el-descriptions-item label="办公地点">{{ selectedCounselor.office || '-' }}</el-descriptions-item>
         </el-descriptions>
-
         <div class="detail-section">
           <h4>管理的班级</h4>
           <div v-if="counselorClasses.length === 0" class="empty-text">暂无管理的班级</div>
-          <el-tag
-            v-for="cls in counselorClasses"
-            :key="cls.id"
-            type="primary"
-            size="small"
-            class="class-tag"
-          >
+          <el-tag v-for="cls in counselorClasses" :key="cls.id" type="primary" size="small" class="class-tag">
             {{ cls.name }} ({{ cls.student_count }}人)
           </el-tag>
         </div>
@@ -127,9 +108,7 @@
           <span class="counselor-name">{{ selectedCounselor.user?.first_name || selectedCounselor.user?.username }}</span>
           <span class="counselor-no">工号：{{ selectedCounselor.employee_no }}</span>
         </div>
-
         <el-divider />
-
         <!-- 已分配班级 -->
         <div class="section">
           <div class="section-title">
@@ -142,28 +121,19 @@
             <el-table-column prop="student_count" label="学生数" width="100" />
             <el-table-column label="操作" width="100" fixed="right">
               <template #default="{ row }">
-                <el-button type="danger" link size="small" @click="removeClass(row)">
-                  移除
-                </el-button>
+                <el-button type="danger" link size="small" @click="removeClass(row)">移除</el-button>
               </template>
             </el-table-column>
           </el-table>
         </div>
-
         <el-divider />
-
         <!-- 可分配班级 -->
         <div class="section">
           <div class="section-title">
             <span>可分配班级</span>
             <el-tag type="success" size="small">{{ availableClasses.length }} 个</el-tag>
           </div>
-          <el-table
-            :data="availableClasses"
-            size="small"
-            v-loading="availableLoading"
-            @selection-change="handleSelectionChange"
-          >
+          <el-table :data="availableClasses" size="small" v-loading="availableLoading" @selection-change="handleSelectionChange">
             <el-table-column type="selection" width="55" />
             <el-table-column prop="name" label="班级名称" min-width="150" />
             <el-table-column prop="grade" label="年级" width="100" />
@@ -171,7 +141,6 @@
           </el-table>
         </div>
       </div>
-
       <template #footer>
         <el-button @click="assignDialogVisible = false">关闭</el-button>
         <el-button type="primary" :disabled="selectedClasses.length === 0" @click="confirmAssign">
@@ -187,15 +156,11 @@ import { ref, reactive, onMounted } from 'vue'
 import { Search, View, School } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  getCounselorList,
-  getCounselorDetail,
-  getCounselorClasses,
-  getAvailableClasses,
-  assignClassesToCounselor,
-  removeClassFromCounselor
+  getCounselorList, getCounselorDetail, getCounselorClasses,
+  getAvailableClasses, assignClassesToCounselor, removeClassFromCounselor,
+  getDepartmentList
 } from '@/api/admin'
 
-// 状态
 const loading = ref(false)
 const classesLoading = ref(false)
 const availableLoading = ref(false)
@@ -206,37 +171,19 @@ const counselorClasses = ref([])
 const availableClasses = ref([])
 const selectedClasses = ref([])
 
-// 筛选表单
-const filterForm = reactive({
-  department: '',
-  search: ''
-})
-
-// 分页
-const pagination = reactive({
-  page: 1,
-  pageSize: 10,
-  total: 0
-})
-
-// 数据
+const filterForm = reactive({ department: '', search: '' })
+const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
 const counselors = ref([])
-const departments = ref(['计算机学院', '软件学院', '信息工程学院', '电子工程学院'])
+const departments = ref([])
 
-// 加载辅导员列表
 const loadData = async () => {
   loading.value = true
   try {
-    const params = {
-      page: pagination.page,
-      page_size: pagination.pageSize,
-      ...filterForm
-    }
+    const params = { page: pagination.page, page_size: pagination.pageSize, ...filterForm }
     const res = await getCounselorList(params)
     if (res.code === 200) {
       counselors.value = res.data?.results || res.data || []
       pagination.total = res.data?.count || counselors.value.length
-
       // 加载每个辅导员的班级数量
       for (const counselor of counselors.value) {
         try {
@@ -257,226 +204,122 @@ const loadData = async () => {
   }
 }
 
-// 筛选
-const handleFilter = () => {
-  pagination.page = 1
-  loadData()
-}
+const handleFilter = () => { pagination.page = 1; loadData() }
+const resetFilter = () => { filterForm.department = ''; filterForm.search = ''; pagination.page = 1; loadData() }
 
-const resetFilter = () => {
-  filterForm.department = ''
-  filterForm.search = ''
-  pagination.page = 1
-  loadData()
+const loadDepartments = async () => {
+  try {
+    const res = await getDepartmentList()
+    if (res.code === 200) {
+      departments.value = res.data || []
+    }
+  } catch (error) {
+    console.error('加载院系列表失败:', error)
+  }
 }
+const handleSizeChange = (val) => { pagination.pageSize = val; loadData() }
+const handlePageChange = (val) => { pagination.page = val; loadData() }
 
-// 分页
-const handleSizeChange = (val) => {
-  pagination.pageSize = val
-  loadData()
-}
-
-const handlePageChange = (val) => {
-  pagination.page = val
-  loadData()
-}
-
-// 查看详情
 const viewDetail = async (row) => {
   selectedCounselor.value = row
   detailDialogVisible.value = true
-
-  // 加载班级列表
+  counselorClasses.value = []
   try {
     const res = await getCounselorClasses(row.id)
-    if (res.code === 200) {
-      counselorClasses.value = res.data || []
-    }
+    if (res.code === 200) counselorClasses.value = res.data || []
   } catch (error) {
-    counselorClasses.value = []
+    console.error('加载班级失败:', error)
   }
 }
 
-// 管理班级
 const manageClasses = async (row) => {
   selectedCounselor.value = row
   selectedClasses.value = []
   assignDialogVisible.value = true
-
-  // 加载已分配班级
   classesLoading.value = true
-  try {
-    const res = await getCounselorClasses(row.id)
-    if (res.code === 200) {
-      counselorClasses.value = res.data || []
-    }
-  } catch (error) {
-    counselorClasses.value = []
-  } finally {
-    classesLoading.value = false
-  }
-
-  // 加载可分配班级
   availableLoading.value = true
   try {
-    const res = await getAvailableClasses()
-    if (res.code === 200) {
-      availableClasses.value = res.data || []
-    }
+    const [classesRes, availableRes] = await Promise.all([
+      getCounselorClasses(row.id),
+      getAvailableClasses()
+    ])
+    if (classesRes.code === 200) counselorClasses.value = classesRes.data || []
+    if (availableRes.code === 200) availableClasses.value = availableRes.data || []
   } catch (error) {
-    availableClasses.value = []
+    console.error('加载班级数据失败:', error)
+    ElMessage.error('加载班级数据失败')
   } finally {
+    classesLoading.value = false
     availableLoading.value = false
   }
 }
 
-// 移除班级
-const removeClass = async (cls) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要移除班级 "${cls.name}" 吗？`,
-      '确认移除',
-      { type: 'warning' }
-    )
+const handleSelectionChange = (selection) => { selectedClasses.value = selection }
 
-    const res = await removeClassFromCounselor(selectedCounselor.value.id, cls.id)
+const confirmAssign = async () => {
+  if (selectedClasses.value.length === 0) return
+  try {
+    const classIds = selectedClasses.value.map(item => item.id)
+    const res = await assignClassesToCounselor(selectedCounselor.value.id, classIds)
+    if (res.code === 200) {
+      ElMessage.success('班级分配成功')
+      manageClasses(selectedCounselor.value)
+      loadData()
+    }
+  } catch (error) {
+    console.error('分配失败:', error)
+    ElMessage.error('分配失败')
+  }
+}
+
+const removeClass = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确定要将 "${row.name}" 从该辅导员管理的班级中移除吗？`, '确认移除', { type: 'warning' })
+    const res = await removeClassFromCounselor(selectedCounselor.value.id, row.id)
     if (res.code === 200) {
       ElMessage.success('移除成功')
-      // 刷新列表
-      counselorClasses.value = counselorClasses.value.filter(c => c.id !== cls.id)
-      // 添加到可分配列表
-      availableClasses.value.push(cls)
-      // 更新计数
-      selectedCounselor.value.classCount = counselorClasses.value.length
+      manageClasses(selectedCounselor.value)
+      loadData()
     }
   } catch (error) {
     if (error !== 'cancel') {
+      console.error('移除失败:', error)
       ElMessage.error('移除失败')
     }
   }
 }
 
-// 选择班级
-const handleSelectionChange = (selection) => {
-  selectedClasses.value = selection
-}
-
-// 确认分配
-const confirmAssign = async () => {
-  if (selectedClasses.value.length === 0) return
-
-  try {
-    const classIds = selectedClasses.value.map(c => c.id)
-    const res = await assignClassesToCounselor(selectedCounselor.value.id, classIds)
-    if (res.code === 200) {
-      ElMessage.success(`成功分配 ${res.data?.assigned_count || 0} 个班级`)
-      // 刷新列表
-      const newClasses = await getCounselorClasses(selectedCounselor.value.id)
-      if (newClasses.code === 200) {
-        counselorClasses.value = newClasses.data || []
-      }
-      // 从可分配列表中移除
-      const assignedIds = selectedClasses.value.map(c => c.id)
-      availableClasses.value = availableClasses.value.filter(c => !assignedIds.includes(c.id))
-      // 清空选择
-      selectedClasses.value = []
-      // 更新计数
-      selectedCounselor.value.classCount = counselorClasses.value.length
-    }
-  } catch (error) {
-    ElMessage.error('分配失败')
-  }
-}
-
 onMounted(() => {
   loadData()
+  loadDepartments()
 })
 </script>
 
 <style scoped>
-.counselors-page {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-}
-
-.header-left h1 {
-  font-size: 24px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 8px;
-}
-
-.header-left p {
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.filter-card {
-  margin-bottom: 20px;
-  border-radius: 12px;
-}
-
-.counselors-card {
-  border-radius: 12px;
-}
+@import './common.css';
 
 .counselor-info {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
 }
 
-.info-text .name {
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.info-text .username {
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #e5e7eb;
-}
-
-/* 详情弹窗 */
 .counselor-detail {
-  padding: 0 10px;
+  padding: 8px 0;
 }
 
 .detail-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
-.detail-info h3 {
-  margin: 0 0 8px 0;
-  font-size: 20px;
-  color: #1f2937;
+.detail-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
 }
 
-.detail-info p {
+.detail-header p {
   margin: 0;
   color: #6b7280;
   font-size: 14px;
-}
-
-.detail-descriptions {
-  margin: 20px 0;
 }
 
 .detail-section {
@@ -484,7 +327,8 @@ onMounted(() => {
 }
 
 .detail-section h4 {
-  margin-bottom: 12px;
+  margin: 0 0 12px 0;
+  font-size: 15px;
   color: #374151;
 }
 
@@ -497,39 +341,31 @@ onMounted(() => {
   margin: 4px;
 }
 
-/* 分配弹窗 */
-.assign-dialog {
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
 .dialog-header {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  align-items: baseline;
+  gap: 12px;
 }
 
 .counselor-name {
-  font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  font-size: 16px;
 }
 
 .counselor-no {
   color: #6b7280;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .section {
-  margin: 20px 0;
+  margin: 12px 0;
 }
 
 .section-title {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  font-weight: 600;
-  color: #374151;
+  margin-bottom: 10px;
+  font-weight: 500;
 }
 </style>

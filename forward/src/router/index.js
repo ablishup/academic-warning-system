@@ -105,9 +105,14 @@ const routes = [
         component: () => import('@/views/admin/Dashboard.vue')
       },
       {
-        path: 'users',
-        name: 'AdminUsers',
-        component: () => import('@/views/admin/Users.vue')
+        path: 'teachers',
+        name: 'AdminTeachers',
+        component: () => import('@/views/admin/TeacherManagement.vue')
+      },
+      {
+        path: 'students',
+        name: 'AdminStudents',
+        component: () => import('@/views/admin/StudentManagement.vue')
       },
       {
         path: 'counselors',
@@ -123,6 +128,11 @@ const routes = [
         path: 'classes',
         name: 'AdminClasses',
         component: () => import('@/views/admin/Classes.vue')
+      },
+      {
+        path: 'passwords',
+        name: 'AdminPasswords',
+        component: () => import('@/views/admin/PasswordManagement.vue')
       }
     ]
   },

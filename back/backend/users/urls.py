@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('change-password/', views.change_password_view, name='change_password'),
     path('current/', views.current_user_view, name='current_user'),
     path('list/', views.user_list_view, name='user_list'),
     path('<int:pk>/', views.user_detail_view, name='user_detail'),
@@ -26,4 +27,8 @@ urlpatterns = [
     path('available-classes/', views.available_classes_view, name='available_classes'),
     # 辅导员Dashboard统计
     path('counselor/dashboard-stats/', views.counselor_dashboard_stats_view, name='counselor_dashboard_stats'),
+    # 院系列表
+    path('departments/', views.department_list_view, name='department_list'),
+    # 管理员Dashboard统计
+    path('admin/dashboard-stats/', views.admin_dashboard_stats_view, name='admin_dashboard_stats'),
 ]

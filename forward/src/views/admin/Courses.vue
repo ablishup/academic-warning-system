@@ -1,5 +1,5 @@
 <template>
-  <div class="courses-page">
+  <div class="admin-page">
     <!-- 页面标题 -->
     <div class="page-header">
       <div class="header-left">
@@ -31,12 +31,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="搜索">
-          <el-input
-            v-model="filterForm.search"
-            placeholder="课程名称/课程代码"
-            clearable
-            style="width: 250px"
-          />
+          <el-input v-model="filterForm.search" placeholder="课程名称/课程代码" clearable style="width: 250px" />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleFilter">
@@ -49,63 +44,42 @@
     </el-card>
 
     <!-- 课程列表 -->
-    <el-card class="courses-card" shadow="hover">
-      <el-table :data="courses" v-loading="loading" stripe>
+    <el-card class="list-card" shadow="hover">
+      <el-table :data="filteredCourses" v-loading="loading" stripe>
         <el-table-column type="index" width="50" />
         <el-table-column label="课程" min-width="200">
           <template #default="{ row }">
             <div class="course-info">
-              <div class="course-name">{{ row.name }}</div>
-              <div class="course-code">{{ row.code }}</div>
+              <div class="info-name">{{ row.name }}</div>
+              <div class="info-meta">{{ row.code }}</div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="teacher_name" label="任课教师" width="120" />
+        <el-table-column label="任课教师" width="120">
+          <template #default="{ row }">
+            {{ getTeacherName(row.teacher_id) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="semester" label="学期" width="120" />
         <el-table-column prop="credit" label="学分" width="80" />
         <el-table-column prop="student_count" label="学生数" width="80" />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column label="状态" width="90">
           <template #default="{ row }">
-            <el-tag :type="getStatusTagType(row.status)" size="small">
-              {{ getStatusLabel(row.status) }}
-            </el-tag>
+            <el-tag :type="getStatusTagType(row.status)" size="small">{{ getStatusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="editCourse(row)">
-              编辑
-            </el-button>
-            <el-button type="success" link size="small" @click="manageStudents(row)">
-              学生管理
-            </el-button>
-            <el-button type="danger" link size="small" @click="deleteCourse(row)">
-              删除
-            </el-button>
+            <el-button type="primary" link size="small" @click="editCourse(row)">编辑</el-button>
+            <el-button type="success" link size="small" @click="manageStudents(row)">学生管理</el-button>
+            <el-button type="danger" link size="small" @click="deleteCourse(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
-
-      <!-- 分页 -->
-      <div class="pagination-container">
-        <el-pagination
-          v-model:current-page="pagination.page"
-          v-model:page-size="pagination.pageSize"
-          :page-sizes="[10, 20, 50]"
-          :total="pagination.total"
-          layout="total, sizes, prev, pager, next"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
     </el-card>
 
     <!-- 新增/编辑课程弹窗 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="isEdit ? '编辑课程' : '新增课程'"
-      width="600px"
-    >
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑课程' : '新增课程'" width="600px">
       <el-form :model="courseForm" label-width="100px" :rules="courseRules" ref="courseFormRef">
         <el-form-item label="课程名称" prop="name">
           <el-input v-model="courseForm.name" placeholder="请输入课程名称" />
@@ -127,12 +101,7 @@
         </el-row>
         <el-form-item label="任课教师" prop="teacher_id">
           <el-select v-model="courseForm.teacher_id" placeholder="选择任课教师" style="width: 100%" filterable>
-            <el-option
-              v-for="teacher in teacherOptions"
-              :key="teacher.id"
-              :label="teacher.name"
-              :value="teacher.id"
-            />
+            <el-option v-for="t in teacherOptions" :key="t.id" :label="t.name" :value="t.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="学期" prop="semester">
@@ -142,12 +111,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="课程描述">
-          <el-input
-            v-model="courseForm.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入课程描述"
-          />
+          <el-input v-model="courseForm.description" type="textarea" :rows="3" placeholder="请输入课程描述" />
         </el-form-item>
         <el-form-item label="状态">
           <el-radio-group v-model="courseForm.status">
@@ -166,18 +130,18 @@
     <!-- 学生管理弹窗 -->
     <el-dialog v-model="studentDialogVisible" title="课程学生管理" width="700px">
       <div v-if="currentCourse" class="student-manage">
-        <div class="current-students">
-          <h4>已选学生 ({{ currentCourseStudents.length }})</h4>
-          <el-table :data="currentCourseStudents" height="250" size="small">
-            <el-table-column prop="student_no" label="学号" width="100" />
-            <el-table-column prop="name" label="姓名" />
-            <el-table-column label="操作" width="80">
-              <template #default="{ row }">
-                <el-button type="danger" link size="small" @click="removeStudent(row)">移除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
+        <div class="manage-header">
+          <h4>{{ currentCourse.name }} - 已选学生 ({{ currentCourseStudents.length }})</h4>
         </div>
+        <el-table :data="currentCourseStudents" height="250" size="small">
+          <el-table-column prop="student_no" label="学号" width="100" />
+          <el-table-column prop="name" label="姓名" />
+          <el-table-column label="操作" width="80">
+            <template #default="{ row }">
+              <el-button type="danger" link size="small" @click="removeStudent(row)">移除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
         <el-divider />
         <div class="add-students">
           <h4>添加学生</h4>
@@ -200,9 +164,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { Plus, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  getAdminCourses, createCourse, updateCourse, deleteCourse as apiDeleteCourse,
+  getTeacherOptions, getCourseStudents, addStudentsToCourse,
+  removeStudentFromCourse, getStudentOptions
+} from '@/api/admin'
+import { getStatusTagType, getStatusLabel } from './common'
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -214,50 +184,13 @@ const currentCourse = ref(null)
 const currentCourseStudents = ref([])
 const selectedStudents = ref([])
 
-// 筛选表单
-const filterForm = reactive({
-  semester: '',
-  status: '',
-  search: ''
-})
-
-// 分页
-const pagination = reactive({
-  page: 1,
-  pageSize: 10,
-  total: 0
-})
-
-// 课程列表
+const filterForm = reactive({ semester: '', status: '', search: '' })
 const courses = ref([])
+const teacherOptions = ref([])
 
-// 教师选项
-const teacherOptions = ref([
-  { id: 1, name: '张教授' },
-  { id: 2, name: '李教授' },
-  { id: 3, name: '王教授' },
-  { id: 4, name: '赵教授' }
-])
-
-// 学生选项
-const studentOptions = ref([
-  { value: 1, label: '张三 (2021001)' },
-  { value: 2, label: '李四 (2021002)' },
-  { value: 3, label: '王五 (2021003)' },
-  { value: 4, label: '赵六 (2021004)' },
-  { value: 5, label: '钱七 (2021005)' }
-])
-
-// 课程表单
 const courseForm = reactive({
-  name: '',
-  code: '',
-  credit: 3,
-  hours: 48,
-  teacher_id: null,
-  semester: '',
-  description: '',
-  status: 'active'
+  name: '', code: '', credit: 3, hours: 48, teacher_id: null,
+  semester: '', description: '', status: 'active'
 })
 
 const courseRules = {
@@ -268,226 +201,209 @@ const courseRules = {
   semester: [{ required: true, message: '请选择学期', trigger: 'change' }]
 }
 
-// 加载数据
+// 前端筛选（后端目前不支持筛选参数）
+const filteredCourses = computed(() => {
+  let list = courses.value
+  if (filterForm.semester) {
+    list = list.filter(c => c.semester === filterForm.semester)
+  }
+  if (filterForm.status) {
+    list = list.filter(c => c.status === filterForm.status)
+  }
+  if (filterForm.search) {
+    const kw = filterForm.search.toLowerCase()
+    list = list.filter(c =>
+      (c.name && c.name.toLowerCase().includes(kw)) ||
+      (c.code && c.code.toLowerCase().includes(kw))
+    )
+  }
+  return list
+})
+
 const loadData = async () => {
   loading.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    courses.value = [
-      { id: 1, name: '数据结构', code: 'CS201', credit: 4, hours: 64, teacher_name: '张教授', teacher_id: 1, semester: '2024-2025-1', student_count: 156, status: 'active', description: '计算机专业核心课程' },
-      { id: 2, name: '算法设计', code: 'CS202', credit: 4, hours: 64, teacher_name: '李教授', teacher_id: 2, semester: '2024-2025-1', student_count: 142, status: 'active', description: '算法分析与设计' },
-      { id: 3, name: '操作系统', code: 'CS301', credit: 4, hours: 64, teacher_name: '王教授', teacher_id: 3, semester: '2024-2025-1', student_count: 138, status: 'active', description: '操作系统原理' },
-      { id: 4, name: '计算机网络', code: 'CS302', credit: 3, hours: 48, teacher_name: '赵教授', teacher_id: 4, semester: '2024-2025-2', student_count: 125, status: 'pending', description: '网络原理与应用' },
-      { id: 5, name: '数据库原理', code: 'CS303', credit: 3, hours: 48, teacher_name: '张教授', teacher_id: 1, semester: '2024-2025-2', student_count: 118, status: 'pending', description: '数据库系统概论' },
-      { id: 6, name: '编译原理', code: 'CS401', credit: 3, hours: 48, teacher_name: '李教授', teacher_id: 2, semester: '2024-2025-1', student_count: 98, status: 'ended', description: '编译器构造' }
-    ]
-    pagination.total = courses.value.length
+    const res = await getAdminCourses()
+    if (res.code === 200) {
+      courses.value = res.data || []
+    }
   } catch (error) {
-    console.error('加载数据失败:', error)
-    ElMessage.error('加载数据失败')
+    console.error('加载课程失败:', error)
+    ElMessage.error('加载课程失败')
   } finally {
     loading.value = false
   }
 }
 
-// 筛选
-const handleFilter = () => {
-  pagination.page = 1
-  loadData()
+const loadTeachers = async () => {
+  try {
+    const res = await getTeacherOptions()
+    if (res.code === 200) {
+      const list = res.data?.results || res.data || []
+      teacherOptions.value = list.map(u => ({
+        id: u.id,
+        name: u.last_name + u.first_name || u.username
+      }))
+    }
+  } catch (error) {
+    console.error('加载教师列表失败:', error)
+  }
 }
 
+const getTeacherName = (teacherId) => {
+  const t = teacherOptions.value.find(opt => opt.id === teacherId)
+  return t?.name || '-'
+}
+
+const handleFilter = () => {}
 const resetFilter = () => {
   filterForm.semester = ''
   filterForm.status = ''
   filterForm.search = ''
-  pagination.page = 1
-  loadData()
 }
 
-// 分页
-const handleSizeChange = (val) => {
-  pagination.pageSize = val
-  loadData()
-}
-
-const handleCurrentChange = (val) => {
-  pagination.page = val
-  loadData()
-}
-
-// 打开新增弹窗
 const openAddDialog = () => {
   isEdit.value = false
-  courseForm.name = ''
-  courseForm.code = ''
-  courseForm.credit = 3
-  courseForm.hours = 48
-  courseForm.teacher_id = null
-  courseForm.semester = ''
-  courseForm.description = ''
-  courseForm.status = 'active'
+  Object.assign(courseForm, { name: '', code: '', credit: 3, hours: 48, teacher_id: null, semester: '', description: '', status: 'active' })
   dialogVisible.value = true
 }
 
-// 编辑课程
 const editCourse = (row) => {
   isEdit.value = true
   currentCourse.value = row
-  courseForm.name = row.name
-  courseForm.code = row.code
-  courseForm.credit = row.credit
-  courseForm.hours = row.hours
-  courseForm.teacher_id = row.teacher_id
-  courseForm.semester = row.semester
-  courseForm.description = row.description
-  courseForm.status = row.status
+  Object.assign(courseForm, {
+    name: row.name, code: row.code, credit: row.credit, hours: row.hours,
+    teacher_id: row.teacher_id, semester: row.semester, description: row.description, status: row.status
+  })
   dialogVisible.value = true
 }
 
-// 提交课程
 const submitCourse = async () => {
   const valid = await courseFormRef.value?.validate().catch(() => false)
   if (!valid) return
-
   submitting.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    ElMessage.success(isEdit.value ? '课程更新成功' : '课程创建成功')
+    if (isEdit.value) {
+      await updateCourse(currentCourse.value.id, courseForm)
+      ElMessage.success('课程更新成功')
+    } else {
+      await createCourse(courseForm)
+      ElMessage.success('课程创建成功')
+    }
     dialogVisible.value = false
     loadData()
   } catch (error) {
     console.error('保存失败:', error)
-    ElMessage.error('保存失败')
+    ElMessage.error(error.message || '保存失败')
   } finally {
     submitting.value = false
   }
 }
 
-// 管理学生
-const manageStudents = (row) => {
-  currentCourse.value = row
-  currentCourseStudents.value = [
-    { id: 1, student_no: '2021001', name: '张三' },
-    { id: 2, student_no: '2021002', name: '李四' },
-    { id: 3, student_no: '2021003', name: '王五' }
-  ]
-  selectedStudents.value = []
-  studentDialogVisible.value = true
-}
-
-// 移除学生
-const removeStudent = async (row) => {
+const deleteCourse = async (row) => {
   try {
-    await ElMessageBox.confirm(`确定要将 ${row.name} 从课程中移除吗？`, '确认', { type: 'warning' })
-    await new Promise(resolve => setTimeout(resolve, 300))
-    currentCourseStudents.value = currentCourseStudents.value.filter(s => s.id !== row.id)
-    ElMessage.success('已移除')
+    await ElMessageBox.confirm(`确定要删除课程 "${row.name}" 吗？`, '确认删除', { type: 'warning' })
+    await apiDeleteCourse(row.id)
+    ElMessage.success('课程已删除')
+    loadData()
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('移除失败:', error)
+      console.error('删除失败:', error)
+      ElMessage.error(error.message || '删除失败')
     }
   }
 }
 
-// 添加学生
+const manageStudents = async (row) => {
+  currentCourse.value = row
+  currentCourseStudents.value = []
+  selectedStudents.value = []
+  studentDialogVisible.value = true
+  try {
+    const res = await getCourseStudents(row.id)
+    if (res.code === 200) {
+      currentCourseStudents.value = res.data || []
+    }
+  } catch (error) {
+    console.error('加载课程学生失败:', error)
+    ElMessage.error('加载课程学生失败')
+  }
+}
+
+const removeStudent = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确定要将 ${row.name} 从课程中移除吗？`, '确认', { type: 'warning' })
+    await removeStudentFromCourse(currentCourse.value.id, row.id)
+    ElMessage.success('已移除')
+    manageStudents(currentCourse.value)
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('移除失败:', error)
+      ElMessage.error('移除失败')
+    }
+  }
+}
+
 const addStudents = async () => {
   if (selectedStudents.value.length === 0) {
     ElMessage.warning('请选择要添加的学生')
     return
   }
   try {
-    await new Promise(resolve => setTimeout(resolve, 500))
+    await addStudentsToCourse(currentCourse.value.id, selectedStudents.value)
     ElMessage.success(`成功添加 ${selectedStudents.value.length} 名学生`)
     selectedStudents.value = []
+    manageStudents(currentCourse.value)
   } catch (error) {
     console.error('添加失败:', error)
     ElMessage.error('添加失败')
   }
 }
 
-// 删除课程
-const deleteCourse = async (row) => {
+const loadStudentOptions = async () => {
   try {
-    await ElMessageBox.confirm(`确定要删除课程 "${row.name}" 吗？`, '确认删除', { type: 'warning' })
-    await new Promise(resolve => setTimeout(resolve, 500))
-    ElMessage.success('课程已删除')
-    loadData()
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除失败:', error)
-      ElMessage.error('删除失败')
+    const res = await getStudentOptions()
+    if (res.code === 200) {
+      const list = res.data || []
+      studentOptions.value = list.map(s => ({
+        value: s.id,
+        label: `${s.student_no} - ${s.name}`
+      }))
     }
+  } catch (error) {
+    console.error('加载学生列表失败:', error)
   }
-}
-
-// 工具函数
-const getStatusTagType = (status) => {
-  const types = { active: 'success', pending: 'info', ended: '' }
-  return types[status] || ''
-}
-
-const getStatusLabel = (status) => {
-  const labels = { active: '进行中', pending: '未开始', ended: '已结束' }
-  return labels[status] || status
 }
 
 onMounted(() => {
   loadData()
+  loadTeachers()
+  loadStudentOptions()
 })
 </script>
 
 <style scoped>
-.courses-page {
-  max-width: 1400px;
-  margin: 0 auto;
-}
+@import './common.css';
 
-.page-header {
+.course-info {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-}
-
-.header-left h1 {
-  font-size: 24px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 8px;
-}
-
-.header-left p {
-  color: #6b7280;
-}
-
-.filter-card {
-  margin-bottom: 24px;
-  border-radius: 12px;
-}
-
-.courses-card {
-  border-radius: 12px;
-}
-
-.course-info .course-name {
-  font-weight: 500;
-  color: #1f2937;
-}
-
-.course-info .course-code {
-  font-size: 12px;
-  color: #6b7280;
-  margin-top: 4px;
-}
-
-.pagination-container {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
+  flex-direction: column;
 }
 
 .student-manage h4 {
-  margin-bottom: 12px;
+  margin: 0 0 12px 0;
   color: #374151;
+  font-size: 14px;
+}
+
+.manage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.add-students {
+  margin-top: 8px;
 }
 </style>

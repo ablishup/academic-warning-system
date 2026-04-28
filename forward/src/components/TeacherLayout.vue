@@ -88,6 +88,7 @@
 import { School, DataBoard, Upload, UserFilled, ArrowDown, FolderOpened, OfficeBuilding } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { ref, onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import { getCurrentTeacherProfile } from '@/api/admin'
 import { ElMessage } from 'element-plus'
 

@@ -17,21 +17,29 @@
           <el-icon><DataBoard /></el-icon>
           <span>系统概览</span>
         </el-menu-item>
-        <el-menu-item index="/admin/users">
+        <el-menu-item index="/admin/courses">
+          <el-icon><Reading /></el-icon>
+          <span>课程管理</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/teachers">
           <el-icon><User /></el-icon>
-          <span>用户管理</span>
+          <span>教师管理</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/students">
+          <el-icon><UserFilled /></el-icon>
+          <span>学生管理</span>
         </el-menu-item>
         <el-menu-item index="/admin/counselors">
           <el-icon><FirstAidKit /></el-icon>
           <span>辅导员管理</span>
         </el-menu-item>
-        <el-menu-item index="/admin/courses">
-          <el-icon><Reading /></el-icon>
-          <span>课程管理</span>
-        </el-menu-item>
         <el-menu-item index="/admin/classes">
           <el-icon><School /></el-icon>
           <span>班级管理</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/passwords">
+          <el-icon><Lock /></el-icon>
+          <span>密码管理</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -43,7 +51,7 @@
         <div class="header-right">
           <el-dropdown>
             <span class="user-info">
-              <span>管理员</span>
+              <span>{{ authStore.userInfo?.username || '管理员' }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -59,12 +67,15 @@
       </el-main>
     </el-container>
   </el-container>
+
+
 </template>
 
 <script setup>
-import { Setting, DataBoard, User, Reading, School, UserFilled, ArrowDown, FirstAidKit } from '@element-plus/icons-vue'
+import { Setting, DataBoard, User, Reading, UserFilled, ArrowDown, FirstAidKit, Lock, School } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -73,6 +84,7 @@ const logout = () => {
   authStore.logout()
   router.push('/login')
 }
+
 </script>
 
 <style scoped>

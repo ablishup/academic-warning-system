@@ -25,40 +25,6 @@ from .serializers import (
 )
 
 
-    # 方法1: 通过 username 匹配 student_no（学号）
-    student = Student.objects.filter(student_no=user.username).first()
-    if student:
-        return student.id
-
-    # 方法2: 通过 first_name 匹配 name（姓名）
-    if user.first_name:
-        student = Student.objects.filter(name=user.first_name).first()
-        if student:
-            return student.id
-
-    # 方法3: 兼容旧账号（student_1）
-    if user.username.startswith('student_'):
-        try:
-            student_id = int(user.username.split('_')[1])
-            student = Student.objects.filter(id=student_id).first()
-            if student:
-                return student.id
-        except (ValueError, IndexError):
-            pass
-
-    # 方法4: 通过 profile 关联 (如果存在)
-    try:
-        profile = getattr(user, 'profile', None)
-        if profile and hasattr(profile, 'employee_no') and profile.employee_no:
-            student = Student.objects.filter(student_no=profile.employee_no).first()
-            if student:
-                return student.id
-    except:
-        pass
-
-    return None
-
-
 # ==================== 学习活动 API ====================
 
 class LearningActivityRecordView(APIView):

@@ -61,6 +61,34 @@ def logout_view(request):
     })
 
 
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def change_password_view(request):
+    """修改当前用户密码"""
+    old_password = request.data.get('old_password')
+    new_password = request.data.get('new_password')
+
+    if not old_password or not new_password:
+        return Response({
+            'code': 400,
+            'message': '请提供旧密码和新密码'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    user = request.user
+    if not user.check_password(old_password):
+        return Response({
+            'code': 400,
+            'message': '旧密码不正确'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(new_password)
+    user.save()
+    return Response({
+        'code': 200,
+        'message': '密码修改成功'
+    })
+
+
 @api_view(['GET'])
 def current_user_view(request):
     """获取当前用户信息"""
@@ -580,5 +608,78 @@ def counselor_dashboard_stats_view(request):
             'class_count': len(class_ids),
             'classes': class_stats,
             'student_ids': student_ids
+        }
+    })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def department_list_view(request):
+    """获取院系列表（从辅导员表取 distinct 值）"""
+    departments = Counselor.objects.exclude(
+        Q(department__isnull=True) | Q(department='')
+    ).values_list('department', flat=True).distinct()
+    return Response({
+        'code': 200,
+        'message': '获取成功',
+        'data': list(departments)
+    })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def admin_dashboard_stats_view(request):
+    """管理员Dashboard统计数据"""
+    from django.contrib.auth.models import User
+    from courses.models import Course
+    from warning_system.models import WarningRecord
+    from interventions.models import InterventionRecord
+
+    # 各角色数量（通过 Group 统计，API 注册的用户均已正确分配 Group）
+    student_count = User.objects.filter(groups__name='student').count()
+    teacher_count = User.objects.filter(groups__name='teacher').count()
+    counselor_count = User.objects.filter(groups__name='counselor').count()
+    admin_count = User.objects.filter(groups__name='admin').count()
+
+    # 如果 Group 统计为 0，尝试通过独立模型兜底
+    if student_count == 0:
+        from classes.models import Student
+        student_count = Student.objects.count()
+    if teacher_count == 0:
+        from users.models import Teacher
+        teacher_count = Teacher.objects.count()
+    if counselor_count == 0:
+        from users.models import Counselor
+        counselor_count = Counselor.objects.count()
+
+    # 最近注册的 5 个用户
+    recent_users = User.objects.order_by('-date_joined')[:5]
+    recent_users_data = [{
+        'id': u.id,
+        'username': u.username,
+        'role': u.groups.first().name if u.groups.exists() else 'unknown',
+        'date_joined': u.date_joined.strftime('%Y-%m-%d') if u.date_joined else ''
+    } for u in recent_users]
+
+    return Response({
+        'code': 200,
+        'message': '获取成功',
+        'data': {
+            'totalUsers': User.objects.count(),
+            'studentCount': student_count,
+            'teacherCount': teacher_count,
+            'counselorCount': counselor_count,
+            'adminCount': admin_count,
+            'totalCourses': Course.objects.count(),
+            'activeWarnings': WarningRecord.objects.filter(status='active').count(),
+            'interventions': InterventionRecord.objects.count(),
+            'newInterventions': 0,
+            'recentUsers': recent_users_data,
+            'userDistribution': {
+                'students': student_count,
+                'teachers': teacher_count,
+                'counselors': counselor_count,
+                'admins': admin_count
+            }
         }
     })

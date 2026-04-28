@@ -204,6 +204,18 @@ export function getAvailableClasses() {
     })
 }
 
+// ==================== 院系列表 ====================
+
+/**
+ * 获取院系列表
+ */
+export function getDepartmentList() {
+    return request({
+        url: '/auth/departments/',
+        method: 'get'
+    })
+}
+
 // ==================== 课程管理 ====================
 
 /**
@@ -259,6 +271,55 @@ export function deleteCourse(id) {
  */
 export function getTeacherOptions() {
     return getUserList({ role: 'teacher', page_size: 100 })
+}
+
+/**
+ * 获取课程学生列表
+ * @param {number} courseId - 课程ID
+ */
+export function getCourseStudents(courseId) {
+    return request({
+        url: `/courses/${courseId}/students/`,
+        method: 'get'
+    })
+}
+
+/**
+ * 批量添加学生到课程
+ * @param {number} courseId - 课程ID
+ * @param {Array} studentIds - 学生ID数组
+ */
+export function addStudentsToCourse(courseId, studentIds) {
+    return request({
+        url: `/courses/${courseId}/add-students/`,
+        method: 'post',
+        data: { student_ids: studentIds }
+    })
+}
+
+/**
+ * 从课程移除学生
+ * @param {number} courseId - 课程ID
+ * @param {number} studentId - 学生ID
+ */
+export function removeStudentFromCourse(courseId, studentId) {
+    return request({
+        url: `/courses/${courseId}/remove-student/`,
+        method: 'post',
+        data: { student_id: studentId }
+    })
+}
+
+// ==================== 专业管理 ====================
+
+/**
+ * 获取专业列表
+ */
+export function getMajorList() {
+    return request({
+        url: '/classes/majors/',
+        method: 'get'
+    })
 }
 
 // ==================== 班级管理 ====================
@@ -318,7 +379,66 @@ export function getCounselorOptions() {
     return getUserList({ role: 'counselor', page_size: 100 })
 }
 
+/**
+ * 获取班级学生列表
+ * @param {number} classId - 班级ID
+ */
+export function getClassStudents(classId) {
+    return request({
+        url: `/classes/${classId}/students/`,
+        method: 'get'
+    })
+}
+
+/**
+ * 批量添加学生到班级
+ * @param {number} classId - 班级ID
+ * @param {Array} studentIds - 学生ID数组
+ */
+export function addStudentsToClass(classId, studentIds) {
+    return request({
+        url: `/classes/${classId}/add-students/`,
+        method: 'post',
+        data: { student_ids: studentIds }
+    })
+}
+
+/**
+ * 从班级移除学生
+ * @param {number} classId - 班级ID
+ * @param {number} studentId - 学生ID
+ */
+export function removeStudentFromClass(classId, studentId) {
+    return request({
+        url: `/classes/${classId}/remove-student/`,
+        method: 'post',
+        data: { student_id: studentId }
+    })
+}
+
+/**
+ * 获取学生列表（支持未分配班级筛选）
+ * @param {Object} params - 查询参数 {unassigned, keyword}
+ */
+export function getStudentOptions(params = {}) {
+    return request({
+        url: '/classes/students/',
+        method: 'get',
+        params
+    })
+}
+
 // ==================== 系统统计 ====================
+
+/**
+ * 获取管理员Dashboard统计数据
+ */
+export function getAdminDashboard() {
+    return request({
+        url: '/auth/admin/dashboard-stats/',
+        method: 'get'
+    })
+}
 
 /**
  * 获取系统概览数据
