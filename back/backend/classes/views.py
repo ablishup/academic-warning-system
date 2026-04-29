@@ -8,53 +8,116 @@ from .models import Student, Class
 from .serializers import StudentSerializer, ClassSerializer, StudentListSerializer
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def student_list_view(request):
-    """获取学生列表"""
-    # 获取查询参数
-    class_id = request.query_params.get('class_id')
-    unassigned = request.query_params.get('unassigned')
-    keyword = request.query_params.get('keyword')
+    """获取学生列表 / 创建学生"""
+    if request.method == 'GET':
+        # 获取查询参数
+        class_id = request.query_params.get('class_id')
+        unassigned = request.query_params.get('unassigned')
+        keyword = request.query_params.get('keyword')
 
-    students = Student.objects.all()
+        students = Student.objects.all()
 
-    if unassigned == 'true':
-        students = students.filter(class_id__isnull=True)
-    elif class_id:
-        students = students.filter(class_id=class_id)
+        if unassigned == 'true':
+            students = students.filter(class_id__isnull=True)
+        elif class_id:
+            students = students.filter(class_id=class_id)
 
-    if keyword:
-        students = students.filter(
-            Q(name__icontains=keyword) |
-            Q(student_no__icontains=keyword)
-        )
+        if keyword:
+            students = students.filter(
+                Q(name__icontains=keyword) |
+                Q(student_no__icontains=keyword)
+            )
 
-    serializer = StudentListSerializer(students, many=True)
-    return Response({
-        'code': 200,
-        'message': '获取成功',
-        'data': serializer.data
-    })
+        # 分页
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 10))
+        total = students.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        students = students[start:end]
+
+        serializer = StudentSerializer(students, many=True)
+        return Response({
+            'code': 200,
+            'message': '获取成功',
+            'data': {
+                'results': serializer.data,
+                'count': total,
+                'page': page,
+                'page_size': page_size
+            }
+        })
+
+    elif request.method == 'POST':
+        data = request.data
+        try:
+            student = Student.objects.create(
+                student_no=data.get('student_no', ''),
+                name=data.get('name', ''),
+                gender=data.get('gender', 0),
+                class_id=data.get('class_id'),
+                phone=data.get('phone', ''),
+                email=data.get('email', ''),
+            )
+            serializer = StudentSerializer(student)
+            return Response({
+                'code': 200,
+                'message': '创建成功',
+                'data': serializer.data
+            })
+        except Exception as e:
+            return Response({
+                'code': 400,
+                'message': f'创建失败: {str(e)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def student_detail_view(request, pk):
-    """获取学生详情"""
+    """获取学生详情 / 更新 / 删除"""
     try:
         student = Student.objects.get(pk=pk)
+    except Student.DoesNotExist:
+        return Response({
+            'code': 404,
+            'message': '学生不存在'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
         serializer = StudentSerializer(student)
         return Response({
             'code': 200,
             'message': '获取成功',
             'data': serializer.data
         })
-    except Student.DoesNotExist:
+
+    elif request.method == 'PUT':
+        data = request.data
+        student.name = data.get('name', student.name)
+        student.student_no = data.get('student_no', student.student_no)
+        student.gender = data.get('gender', student.gender)
+        student.phone = data.get('phone', student.phone)
+        student.email = data.get('email', student.email)
+        student.class_id = data.get('class_id', student.class_id)
+        student.major_id = data.get('major_id', student.major_id)
+        student.save()
+        serializer = StudentSerializer(student)
         return Response({
-            'code': 404,
-            'message': '学生不存在'
-        }, status=status.HTTP_404_NOT_FOUND)
+            'code': 200,
+            'message': '更新成功',
+            'data': serializer.data
+        })
+
+    elif request.method == 'DELETE':
+        student.delete()
+        return Response({
+            'code': 200,
+            'message': '删除成功'
+        })
 
 
 from users.models import User

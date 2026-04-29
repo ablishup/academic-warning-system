@@ -11,6 +11,7 @@
           <el-icon><Plus /></el-icon>
           新增班级
         </el-button>
+        <BatchImportButtons module="class" />
       </div>
     </div>
 
@@ -211,6 +212,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
+import BatchImportButtons from '@/components/BatchImportButtons.vue'
 import { Plus, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {

@@ -11,20 +11,18 @@
           <el-icon><Plus /></el-icon>
           新增教师
         </el-button>
+        <BatchImportButtons module="teacher" />
       </div>
     </div>
 
     <!-- 筛选栏 -->
     <el-card class="filter-card" shadow="hover">
       <el-form :model="filterForm" inline>
-        <el-form-item label="状态">
-          <el-select v-model="filterForm.is_active" placeholder="全部状态" clearable style="width: 150px">
-            <el-option label="启用" :value="true" />
-            <el-option label="禁用" :value="false" />
-          </el-select>
+        <el-form-item label="院系">
+          <el-input v-model="filterForm.department" placeholder="全部院系" clearable style="width: 180px" />
         </el-form-item>
         <el-form-item label="搜索">
-          <el-input v-model="filterForm.search" placeholder="用户名/姓名/工号" clearable style="width: 250px" />
+          <el-input v-model="filterForm.search" placeholder="姓名/工号" clearable style="width: 250px" />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleFilter">
@@ -38,37 +36,34 @@
 
     <!-- 教师列表 -->
     <el-card class="list-card" shadow="hover">
-      <el-table :data="users" v-loading="loading" stripe>
+      <el-table :data="teachers" v-loading="loading" stripe>
         <el-table-column type="index" width="50" />
-        <el-table-column label="用户" min-width="180">
+        <el-table-column label="姓名" min-width="120">
           <template #default="{ row }">
             <div class="user-info">
               <div class="user-meta">
-                <div class="info-name">{{ row.username }}</div>
-                <div class="info-meta" v-if="row.first_name || row.last_name">
-                  {{ row.last_name }}{{ row.first_name }}
-                </div>
+                <div class="info-name">{{ row.name || row.username }}</div>
+                <div class="info-meta">{{ row.username }}</div>
               </div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="student_no" label="工号" width="120" />
+        <el-table-column prop="teacher_no" label="工号" width="120" />
+        <el-table-column prop="department" label="院系" width="150" show-overflow-tooltip />
+        <el-table-column prop="title" label="职称" width="100" />
         <el-table-column prop="email" label="邮箱" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="phone" label="电话" width="120" />
+        <el-table-column prop="office" label="办公室" width="120" show-overflow-tooltip />
         <el-table-column label="状态" width="80">
           <template #default="{ row }">
-            <el-switch v-model="row.is_active" @change="(val) => toggleUserStatus(row, val)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="注册时间" width="120">
-          <template #default="{ row }">
-            {{ formatDate(row.date_joined) }}
+            <el-switch v-model="row.is_active" @change="(val) => toggleStatus(row, val)" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="editUser(row)">编辑</el-button>
             <el-button type="warning" link size="small" @click="resetPassword(row)">重置密码</el-button>
-            <el-button type="danger" link size="small" @click="handleDeleteUser(row)">删除</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -141,13 +136,13 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import BatchImportButtons from '@/components/BatchImportButtons.vue'
 import { Plus, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  getUserList, createUser, updateUser, deleteUser as apiDeleteUser,
+  getTeacherList, createUser, updateTeacher, updateUser, deleteUser as apiDeleteUser,
   resetUserPassword, toggleUserStatus as apiToggleUserStatus
 } from '@/api/admin'
-import { formatDate } from './common'
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -159,9 +154,9 @@ const userFormRef = ref(null)
 const resetFormRef = ref(null)
 const currentUser = ref(null)
 
-const filterForm = reactive({ role: 'teacher', is_active: undefined, search: '' })
+const filterForm = reactive({ department: '', search: '' })
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
-const users = ref([])
+const teachers = ref([])
 
 const userForm = reactive({
   username: '', password: '', first_name: '', last_name: '', student_no: '',
@@ -191,9 +186,9 @@ const loadData = async () => {
   loading.value = true
   try {
     const params = { page: pagination.page, page_size: pagination.pageSize, ...filterForm }
-    const res = await getUserList(params)
+    const res = await getTeacherList(params)
     if (res.code === 200) {
-      users.value = res.data?.results || []
+      teachers.value = res.data?.results || []
       pagination.total = res.data?.count || 0
     }
   } catch (error) {
@@ -206,7 +201,7 @@ const loadData = async () => {
 
 const handleFilter = () => { pagination.page = 1; loadData() }
 const resetFilter = () => {
-  filterForm.is_active = undefined; filterForm.search = ''
+  filterForm.department = ''; filterForm.search = ''
   pagination.page = 1; loadData()
 }
 const handleSizeChange = (val) => { pagination.pageSize = val; loadData() }
@@ -222,8 +217,8 @@ const editUser = (row) => {
   isEdit.value = true
   currentUser.value = row
   Object.assign(userForm, {
-    username: row.username, first_name: row.first_name, last_name: row.last_name,
-    student_no: row.student_no, role: 'teacher', email: row.email, phone: row.phone, is_active: row.is_active
+    username: row.username, first_name: row.name, last_name: '',
+    student_no: row.teacher_no, role: 'teacher', email: row.email, phone: row.phone, is_active: row.is_active
   })
   dialogVisible.value = true
 }
@@ -234,7 +229,7 @@ const submitUser = async () => {
   submitting.value = true
   try {
     if (isEdit.value) {
-      await updateUser(currentUser.value.id, userForm)
+      await updateTeacher(currentUser.value.id, userForm)
       ElMessage.success('教师更新成功')
     } else {
       await createUser(userForm)
@@ -250,9 +245,9 @@ const submitUser = async () => {
   }
 }
 
-const toggleUserStatus = async (row, val) => {
+const toggleStatus = async (row, val) => {
   try {
-    await apiToggleUserStatus(row.id, val)
+    await apiToggleUserStatus(row.user_id, val)
     ElMessage.success(val ? '教师已启用' : '教师已禁用')
   } catch (error) {
     console.error('更新状态失败:', error)
@@ -272,7 +267,7 @@ const submitResetPassword = async () => {
   if (!valid) return
   resetting.value = true
   try {
-    await resetUserPassword(currentUser.value.id, resetForm.password)
+    await resetUserPassword(currentUser.value.user_id, resetForm.password)
     ElMessage.success('密码重置成功')
     resetDialogVisible.value = false
   } catch (error) {
@@ -283,10 +278,10 @@ const submitResetPassword = async () => {
   }
 }
 
-const handleDeleteUser = async (row) => {
+const handleDelete = async (row) => {
   try {
-    await ElMessageBox.confirm(`确定要删除教师 "${row.username}" 吗？`, '确认删除', { type: 'warning' })
-    await apiDeleteUser(row.id)
+    await ElMessageBox.confirm(`确定要删除教师 "${row.name || row.username}" 吗？`, '确认删除', { type: 'warning' })
+    await apiDeleteUser(row.user_id)
     ElMessage.success('教师已删除')
     loadData()
   } catch (error) {

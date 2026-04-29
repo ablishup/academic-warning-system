@@ -323,10 +323,23 @@ def teacher_list_view(request):
             Q(teacher_no__icontains=search)
         )
 
+    # 分页
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 10))
+    total = teachers.count()
+    start = (page - 1) * page_size
+    end = start + page_size
+    teachers = teachers[start:end]
+
     serializer = TeacherSerializer(teachers, many=True)
     return Response({
         'code': 200,
-        'data': serializer.data
+        'data': {
+            'results': serializer.data,
+            'count': total,
+            'page': page,
+            'page_size': page_size
+        }
     })
 
 
@@ -350,47 +363,105 @@ def counselor_list_view(request):
             Q(employee_no__icontains=search)
         )
 
+    # 分页
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 10))
+    total = counselors.count()
+    start = (page - 1) * page_size
+    end = start + page_size
+    counselors = counselors[start:end]
+
     serializer = CounselorSerializer(counselors, many=True)
     return Response({
         'code': 200,
-        'data': serializer.data
+        'data': {
+            'results': serializer.data,
+            'count': total,
+            'page': page,
+            'page_size': page_size
+        }
     })
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PUT'])
 @permission_classes([permissions.IsAuthenticated])
 def teacher_detail_view(request, pk):
-    """获取指定教师的详细信息"""
+    """获取/更新指定教师的详细信息"""
     try:
         teacher = Teacher.objects.select_related('user').get(pk=pk)
-        serializer = TeacherSerializer(teacher)
-        return Response({
-            'code': 200,
-            'data': serializer.data
-        })
     except Teacher.DoesNotExist:
         return Response({
             'code': 404,
             'message': '教师不存在'
         }, status=status.HTTP_404_NOT_FOUND)
 
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def counselor_detail_view(request, pk):
-    """获取指定辅导员的详细信息"""
-    try:
-        counselor = Counselor.objects.select_related('user').get(pk=pk)
-        serializer = CounselorSerializer(counselor)
+    if request.method == 'GET':
+        serializer = TeacherSerializer(teacher)
         return Response({
             'code': 200,
             'data': serializer.data
         })
+
+    elif request.method == 'PUT':
+        data = request.data
+        teacher.teacher_no = data.get('teacher_no', teacher.teacher_no)
+        teacher.department = data.get('department', teacher.department)
+        teacher.title = data.get('title', teacher.title)
+        teacher.phone = data.get('phone', teacher.phone)
+        teacher.office = data.get('office', teacher.office)
+        if 'name' in data:
+            teacher.user.first_name = data['name']
+            teacher.user.save()
+        if 'email' in data:
+            teacher.user.email = data['email']
+            teacher.user.save()
+        teacher.save()
+        serializer = TeacherSerializer(teacher)
+        return Response({
+            'code': 200,
+            'message': '更新成功',
+            'data': serializer.data
+        })
+
+
+@api_view(['GET', 'PUT'])
+@permission_classes([permissions.IsAuthenticated])
+def counselor_detail_view(request, pk):
+    """获取/更新指定辅导员的详细信息"""
+    try:
+        counselor = Counselor.objects.select_related('user').get(pk=pk)
     except Counselor.DoesNotExist:
         return Response({
             'code': 404,
             'message': '辅导员不存在'
         }, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = CounselorSerializer(counselor)
+        return Response({
+            'code': 200,
+            'data': serializer.data
+        })
+
+    elif request.method == 'PUT':
+        data = request.data
+        counselor.employee_no = data.get('employee_no', counselor.employee_no)
+        counselor.department = data.get('department', counselor.department)
+        counselor.phone = data.get('phone', counselor.phone)
+        counselor.office = data.get('office', counselor.office)
+        if 'name' in data:
+            counselor.user.first_name = data['name']
+            counselor.user.save()
+        if 'email' in data:
+            counselor.user.email = data['email']
+            counselor.user.save()
+        counselor.save()
+        serializer = CounselorSerializer(counselor)
+        return Response({
+            'code': 200,
+            'message': '更新成功',
+            'data': serializer.data
+        })
 
 
 @api_view(['GET'])
@@ -681,5 +752,71 @@ def admin_dashboard_stats_view(request):
                 'counselors': counselor_count,
                 'admins': admin_count
             }
+        }
+    })
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def create_student_account_view(request):
+    """为学生创建登录账号"""
+    student_id = request.data.get('student_id')
+    if not student_id:
+        return Response({
+            'code': 400,
+            'message': '请指定学生'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        from classes.models import Student
+        student = Student.objects.get(id=student_id)
+    except Student.DoesNotExist:
+        return Response({
+            'code': 404,
+            'message': '学生不存在'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # 检查是否已有账号
+    from .models import UserProfile
+    existing_user = User.objects.filter(username=student.student_no).first()
+    if not existing_user:
+        profile = UserProfile.objects.filter(employee_no=student.student_no).select_related('user').first()
+        if profile:
+            existing_user = profile.user
+
+    if existing_user:
+        return Response({
+            'code': 400,
+            'message': '该学生已存在登录账号'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # 创建用户
+    password = request.data.get('password', student.student_no + '123')
+    user = User.objects.create_user(
+        username=student.student_no,
+        password=password,
+        first_name=student.name,
+        email=student.email or ''
+    )
+
+    # 添加到 student 组
+    group, _ = Group.objects.get_or_create(name='student')
+    user.groups.add(group)
+
+    # 创建 UserProfile
+    UserProfile.objects.create(
+        user=user,
+        employee_no=student.student_no,
+        phone=student.phone or '',
+        department=''
+    )
+
+    return Response({
+        'code': 200,
+        'message': '账号创建成功',
+        'data': {
+            'user_id': user.id,
+            'username': user.username,
+            'password': password
         }
     })

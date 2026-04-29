@@ -4,49 +4,9 @@
     <div class="page-header">
       <div class="header-left">
         <h1>管理控制台</h1>
-        <p>系统数据概览与功能导航</p>
+        <p>请选择下方功能模块进入管理</p>
       </div>
     </div>
-
-    <!-- 统计栏 -->
-    <el-row :gutter="20" class="stats-row" v-loading="statsLoading">
-      <el-col :xs="12" :sm="8" :lg="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-value">{{ stats.totalUsers || 0 }}</div>
-          <div class="stat-label">总用户数</div>
-        </el-card>
-      </el-col>
-      <el-col :xs="12" :sm="8" :lg="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-value">{{ stats.studentCount || 0 }}</div>
-          <div class="stat-label">学生</div>
-        </el-card>
-      </el-col>
-      <el-col :xs="12" :sm="8" :lg="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-value">{{ stats.teacherCount || 0 }}</div>
-          <div class="stat-label">教师</div>
-        </el-card>
-      </el-col>
-      <el-col :xs="12" :sm="8" :lg="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-value">{{ stats.counselorCount || 0 }}</div>
-          <div class="stat-label">辅导员</div>
-        </el-card>
-      </el-col>
-      <el-col :xs="12" :sm="8" :lg="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-value">{{ stats.totalCourses || 0 }}</div>
-          <div class="stat-label">课程</div>
-        </el-card>
-      </el-col>
-      <el-col :xs="12" :sm="8" :lg="4">
-        <el-card class="stat-card" shadow="hover">
-          <div class="stat-value" style="color: #ef4444">{{ stats.activeWarnings || 0 }}</div>
-          <div class="stat-label">活跃预警</div>
-        </el-card>
-      </el-col>
-    </el-row>
 
     <!-- 功能模块卡片 -->
     <el-row :gutter="24" class="module-row">
@@ -87,21 +47,21 @@
         </el-card>
       </el-col>
       <el-col :xs="24" :sm="12" :lg="8">
-        <el-card class="module-card" shadow="hover" @click="$router.push('/admin/passwords')">
-          <div class="module-icon" style="background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);">
-            <el-icon :size="40"><Key /></el-icon>
-          </div>
-          <div class="module-title">密码管理</div>
-          <div class="module-desc">管理所有账号的登录密码</div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="12" :lg="8">
         <el-card class="module-card" shadow="hover" @click="$router.push('/admin/classes')">
           <div class="module-icon" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);">
             <el-icon :size="40"><School /></el-icon>
           </div>
           <div class="module-title">班级管理</div>
           <div class="module-desc">管理班级信息，分配学生和辅导员</div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="12" :lg="8">
+        <el-card class="module-card" shadow="hover" @click="$router.push('/admin/passwords')">
+          <div class="module-icon" style="background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);">
+            <el-icon :size="40"><Key /></el-icon>
+          </div>
+          <div class="module-title">密码管理</div>
+          <div class="module-desc">管理所有账号的登录密码</div>
         </el-card>
       </el-col>
     </el-row>
@@ -111,35 +71,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
 import { Reading, User, UserFilled, FirstAidKit, Key, School } from '@element-plus/icons-vue'
-import { getAdminDashboard } from '@/api/admin'
-
-const statsLoading = ref(false)
-const stats = reactive({
-  totalUsers: 0,
-  studentCount: 0,
-  teacherCount: 0,
-  counselorCount: 0,
-  totalCourses: 0,
-  activeWarnings: 0
-})
-
-const loadStats = async () => {
-  statsLoading.value = true
-  try {
-    const res = await getAdminDashboard()
-    if (res.code === 200 && res.data) {
-      Object.assign(stats, res.data)
-    }
-  } catch (error) {
-    console.error('加载统计数据失败:', error)
-  } finally {
-    statsLoading.value = false
-  }
-}
-
-onMounted(() => { loadStats() })
 </script>
 
 <style scoped>
@@ -165,36 +97,6 @@ onMounted(() => { loadStats() })
   color: #9ca3af;
   margin: 0;
   font-size: 15px;
-}
-
-.stats-row {
-  margin-bottom: 24px;
-}
-
-.stats-row .el-col {
-  margin-bottom: 16px;
-}
-
-.stat-card {
-  border-radius: 12px;
-  text-align: center;
-}
-
-.stat-card :deep(.el-card__body) {
-  padding: 20px 12px;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1f2937;
-  line-height: 1.2;
-}
-
-.stat-label {
-  font-size: 13px;
-  color: #9ca3af;
-  margin-top: 6px;
 }
 
 .module-row {

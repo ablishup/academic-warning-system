@@ -29,6 +29,8 @@ urlpatterns = [
     path('counselor/dashboard-stats/', views.counselor_dashboard_stats_view, name='counselor_dashboard_stats'),
     # 院系列表
     path('departments/', views.department_list_view, name='department_list'),
+    # 为学生创建登录账号
+    path('students/create-account/', views.create_student_account_view, name='create_student_account'),
     # 管理员Dashboard统计
     path('admin/dashboard-stats/', views.admin_dashboard_stats_view, name='admin_dashboard_stats'),
 ]

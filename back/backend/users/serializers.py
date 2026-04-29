@@ -249,11 +249,14 @@ class TeacherSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     name = serializers.CharField(source='user.first_name', read_only=True)
     email = serializers.CharField(source='user.email', read_only=True)
+    is_active = serializers.BooleanField(source='user.is_active', read_only=True)
+    date_joined = serializers.DateTimeField(source='user.date_joined', read_only=True)
 
     class Meta:
         model = Teacher
         fields = ['id', 'user_id', 'username', 'name', 'email', 'teacher_no',
-                  'department', 'title', 'phone', 'office', 'created_at', 'updated_at']
+                  'department', 'title', 'phone', 'office', 'is_active', 'date_joined',
+                  'created_at', 'updated_at']
 
 
 class CounselorSerializer(serializers.ModelSerializer):
@@ -261,8 +264,10 @@ class CounselorSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     name = serializers.CharField(source='user.first_name', read_only=True)
     email = serializers.CharField(source='user.email', read_only=True)
+    is_active = serializers.BooleanField(source='user.is_active', read_only=True)
 
     class Meta:
         model = Counselor
         fields = ['id', 'user_id', 'username', 'name', 'email', 'employee_no',
-                  'department', 'phone', 'office', 'created_at', 'updated_at']
+                  'department', 'phone', 'office', 'is_active',
+                  'created_at', 'updated_at']

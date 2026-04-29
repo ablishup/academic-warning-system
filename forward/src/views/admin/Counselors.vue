@@ -6,6 +6,13 @@
         <h1>辅导员管理</h1>
         <p>管理辅导员信息及班级分配</p>
       </div>
+      <div class="header-actions">
+        <el-button type="primary" @click="openAddDialog">
+          <el-icon><Plus /></el-icon>
+          新增辅导员
+        </el-button>
+        <BatchImportButtons module="counselor" />
+      </div>
     </div>
 
     <!-- 筛选栏 -->
@@ -32,11 +39,12 @@
     <!-- 辅导员列表 -->
     <el-card class="list-card" shadow="hover" v-loading="loading">
       <el-table :data="counselors" stripe>
+        <el-table-column type="index" label="序号" width="60" />
         <el-table-column label="辅导员" min-width="150">
           <template #default="{ row }">
             <div class="counselor-info">
-              <div class="info-name">{{ row.user?.first_name || row.user?.username }}</div>
-              <div class="info-meta">{{ row.user?.username }}</div>
+              <div class="info-name">{{ row.name || row.username }}</div>
+              <div class="info-meta">{{ row.username }}</div>
             </div>
           </template>
         </el-table-column>
@@ -48,10 +56,13 @@
             <el-tag type="primary" size="small">{{ row.classCount || 0 }} 个</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="viewDetail(row)">
               <el-icon><View /></el-icon>详情
+            </el-button>
+            <el-button type="warning" link size="small" @click="openEditDialog(row)">
+              <el-icon><Edit /></el-icon>编辑
             </el-button>
             <el-button type="success" link size="small" @click="manageClasses(row)">
               <el-icon><School /></el-icon>分配班级
@@ -79,16 +90,16 @@
       <div v-if="selectedCounselor" class="counselor-detail">
         <div class="detail-header">
           <div class="detail-info">
-            <h3>{{ selectedCounselor.user?.first_name || selectedCounselor.user?.username }}</h3>
+            <h3>{{ selectedCounselor.name || selectedCounselor.username }}</h3>
             <p>工号：{{ selectedCounselor.employee_no }}</p>
           </div>
         </div>
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="用户名">{{ selectedCounselor.user?.username }}</el-descriptions-item>
+          <el-descriptions-item label="用户名">{{ selectedCounselor.username }}</el-descriptions-item>
           <el-descriptions-item label="工号">{{ selectedCounselor.employee_no }}</el-descriptions-item>
           <el-descriptions-item label="院系">{{ selectedCounselor.department || '-' }}</el-descriptions-item>
           <el-descriptions-item label="电话">{{ selectedCounselor.phone || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="邮箱">{{ selectedCounselor.user?.email || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="邮箱">{{ selectedCounselor.email || '-' }}</el-descriptions-item>
           <el-descriptions-item label="办公地点">{{ selectedCounselor.office || '-' }}</el-descriptions-item>
         </el-descriptions>
         <div class="detail-section">
@@ -105,7 +116,7 @@
     <el-dialog v-model="assignDialogVisible" title="分配班级" width="700px">
       <div v-if="selectedCounselor" class="assign-dialog">
         <div class="dialog-header">
-          <span class="counselor-name">{{ selectedCounselor.user?.first_name || selectedCounselor.user?.username }}</span>
+          <span class="counselor-name">{{ selectedCounselor.name || selectedCounselor.username }}</span>
           <span class="counselor-no">工号：{{ selectedCounselor.employee_no }}</span>
         </div>
         <el-divider />
@@ -148,17 +159,82 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 编辑辅导员弹窗 -->
+    <el-dialog v-model="editDialogVisible" title="编辑辅导员" width="600px">
+      <el-form :model="editForm" :rules="editRules" ref="editFormRef" label-width="100px">
+        <el-form-item label="姓名" prop="name">
+          <el-input v-model="editForm.name" placeholder="请输入姓名" />
+        </el-form-item>
+        <el-form-item label="工号" prop="employee_no">
+          <el-input v-model="editForm.employee_no" placeholder="请输入工号" />
+        </el-form-item>
+        <el-form-item label="院系">
+          <el-select v-model="editForm.department" placeholder="请选择院系" clearable style="width: 100%">
+            <el-option v-for="dept in departments" :key="dept" :label="dept" :value="dept" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="电话">
+          <el-input v-model="editForm.phone" placeholder="请输入电话" />
+        </el-form-item>
+        <el-form-item label="邮箱">
+          <el-input v-model="editForm.email" placeholder="请输入邮箱" />
+        </el-form-item>
+        <el-form-item label="办公室">
+          <el-input v-model="editForm.office" placeholder="请输入办公室" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editSubmitting" @click="submitEdit">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 新增辅导员弹窗 -->
+    <el-dialog v-model="addDialogVisible" title="新增辅导员" width="600px">
+      <el-form :model="addForm" :rules="addRules" ref="addFormRef" label-width="100px">
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="addForm.username" placeholder="请输入用户名" />
+        </el-form-item>
+        <el-form-item label="密码" prop="password">
+          <el-input v-model="addForm.password" type="password" placeholder="请输入密码" show-password />
+        </el-form-item>
+        <el-form-item label="姓名">
+          <el-row :gutter="10">
+            <el-col :span="12"><el-input v-model="addForm.last_name" placeholder="姓" /></el-col>
+            <el-col :span="12"><el-input v-model="addForm.first_name" placeholder="名" /></el-col>
+          </el-row>
+        </el-form-item>
+        <el-form-item label="工号">
+          <el-input v-model="addForm.student_no" placeholder="请输入工号" />
+        </el-form-item>
+        <el-form-item label="邮箱">
+          <el-input v-model="addForm.email" placeholder="请输入邮箱" />
+        </el-form-item>
+        <el-form-item label="电话">
+          <el-input v-model="addForm.phone" placeholder="请输入电话" />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-switch v-model="addForm.is_active" active-text="启用" inactive-text="禁用" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="addDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="addSubmitting" @click="submitAdd">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Search, View, School } from '@element-plus/icons-vue'
+import { Search, View, School, Edit, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import BatchImportButtons from '@/components/BatchImportButtons.vue'
 import {
   getCounselorList, getCounselorDetail, getCounselorClasses,
   getAvailableClasses, assignClassesToCounselor, removeClassFromCounselor,
-  getDepartmentList
+  getDepartmentList, updateCounselor, createUser
 } from '@/api/admin'
 
 const loading = ref(false)
@@ -166,10 +242,29 @@ const classesLoading = ref(false)
 const availableLoading = ref(false)
 const detailDialogVisible = ref(false)
 const assignDialogVisible = ref(false)
+const editDialogVisible = ref(false)
+const editSubmitting = ref(false)
+const addDialogVisible = ref(false)
+const addSubmitting = ref(false)
 const selectedCounselor = ref(null)
 const counselorClasses = ref([])
 const availableClasses = ref([])
 const selectedClasses = ref([])
+const editForm = reactive({ name: '', employee_no: '', department: '', phone: '', email: '', office: '' })
+const editFormRef = ref(null)
+const editRules = {
+  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  employee_no: [{ required: true, message: '请输入工号', trigger: 'blur' }]
+}
+const addForm = reactive({
+  username: '', password: '', first_name: '', last_name: '',
+  student_no: '', role: 'counselor', email: '', phone: '', is_active: true
+})
+const addFormRef = ref(null)
+const addRules = {
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  password: [{ required: true, message: '请输入密码', trigger: 'blur', min: 6 }]
+}
 
 const filterForm = reactive({ department: '', search: '' })
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
@@ -251,6 +346,61 @@ const manageClasses = async (row) => {
   } finally {
     classesLoading.value = false
     availableLoading.value = false
+  }
+}
+
+const openEditDialog = (row) => {
+  selectedCounselor.value = row
+  Object.assign(editForm, {
+    name: row.name || '',
+    employee_no: row.employee_no || '',
+    department: row.department || '',
+    phone: row.phone || '',
+    email: row.email || '',
+    office: row.office || ''
+  })
+  editDialogVisible.value = true
+}
+
+const openAddDialog = () => {
+  Object.assign(addForm, {
+    username: '', password: '', first_name: '', last_name: '',
+    student_no: '', role: 'counselor', email: '', phone: '', is_active: true
+  })
+  addDialogVisible.value = true
+}
+
+const submitAdd = async () => {
+  const valid = await addFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  addSubmitting.value = true
+  try {
+    await createUser(addForm)
+    ElMessage.success('辅导员创建成功')
+    addDialogVisible.value = false
+    loadData()
+  } catch (error) {
+    console.error('创建失败:', error)
+    ElMessage.error(error.message || '创建失败')
+  } finally {
+    addSubmitting.value = false
+  }
+}
+
+const submitEdit = async () => {
+  const valid = await editFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  editSubmitting.value = true
+  try {
+    await updateCounselor(selectedCounselor.value.id, editForm)
+    ElMessage.success('辅导员信息更新成功')
+    editDialogVisible.value = false
+    loadData()
+  } catch (error) {
+    console.error('更新失败:', error)
+    ElMessage.error(error.message || '更新失败')
+  } finally {
+    editSubmitting.value = false
   }
 }
 

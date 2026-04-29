@@ -147,6 +147,19 @@ export function getTeacherDetail(id) {
 }
 
 /**
+ * 更新教师信息
+ * @param {number} id - 教师ID
+ * @param {Object} data - 更新数据
+ */
+export function updateTeacher(id, data) {
+    return request({
+        url: `/auth/teachers/${id}/`,
+        method: 'put',
+        data
+    })
+}
+
+/**
  * 获取指定辅导员详情
  * @param {number} id - 辅导员ID
  */
@@ -154,6 +167,19 @@ export function getCounselorDetail(id) {
     return request({
         url: `/auth/counselors/${id}/`,
         method: 'get'
+    })
+}
+
+/**
+ * 更新辅导员信息
+ * @param {number} id - 辅导员ID
+ * @param {Object} data - 更新数据
+ */
+export function updateCounselor(id, data) {
+    return request({
+        url: `/auth/counselors/${id}/`,
+        method: 'put',
+        data
     })
 }
 
@@ -425,6 +451,67 @@ export function getStudentOptions(params = {}) {
         url: '/classes/students/',
         method: 'get',
         params
+    })
+}
+
+/**
+ * 获取学生列表（分页）
+ * @param {Object} params - 查询参数 {keyword, page, page_size}
+ */
+export function getStudentList(params = {}) {
+    return request({
+        url: '/classes/students/',
+        method: 'get',
+        params
+    })
+}
+
+/**
+ * 创建学生
+ * @param {Object} data - 学生数据
+ */
+export function createStudent(data) {
+    return request({
+        url: '/classes/students/',
+        method: 'post',
+        data
+    })
+}
+
+/**
+ * 更新学生
+ * @param {number} id - 学生ID
+ * @param {Object} data - 更新数据
+ */
+export function updateStudent(id, data) {
+    return request({
+        url: `/classes/students/${id}/`,
+        method: 'put',
+        data
+    })
+}
+
+/**
+ * 删除学生
+ * @param {number} id - 学生ID
+ */
+export function deleteStudent(id) {
+    return request({
+        url: `/classes/students/${id}/`,
+        method: 'delete'
+    })
+}
+
+/**
+ * 为学生创建登录账号
+ * @param {number} studentId - 学生ID
+ * @param {string} password - 密码（可选，默认学号+123）
+ */
+export function createStudentAccount(studentId, password) {
+    return request({
+        url: '/auth/students/create-account/',
+        method: 'post',
+        data: { student_id: studentId, password }
     })
 }
 
