@@ -72,26 +72,57 @@
       </div>
     </el-card>
 
-    <!-- 预警卡片 -->
-    <el-card v-if="currentWarning" class="warning-card" :class="currentWarning.risk_level">
-      <div class="warning-header">
-        <div class="warning-icon-wrapper">
-          <el-icon :size="32"><WarningFilled /></el-icon>
-        </div>
-        <div class="warning-info">
-          <h3>{{ getRiskTitle(currentWarning.risk_level) }}</h3>
-          <p class="warning-desc">综合得分: <strong>{{ currentWarning.composite_score }}</strong> 分</p>
-        </div>
-        <el-tag :type="getRiskTagType(currentWarning.risk_level)" size="large" effect="dark">
-          {{ getRiskLevelText(currentWarning.risk_level) }}
-        </el-tag>
-      </div>
-      <el-divider />
-      <div class="suggestion-section" v-if="currentWarning.suggestion">
-        <h4><el-icon><MagicStick /></el-icon> 学习建议</h4>
-        <p class="suggestion-text">{{ currentWarning.suggestion }}</p>
-      </div>
-    </el-card>
+    <!-- 预警卡片列表 -->
+    <div v-if="warnings.length > 0" class="warnings-section">
+      <h3 class="section-title">课程预警状态</h3>
+      <el-row :gutter="16">
+        <el-col :span="12" v-for="warning in warnings" :key="warning.id">
+          <el-card class="warning-card" :class="warning.risk_level" shadow="hover">
+            <div class="warning-header">
+              <div class="warning-icon-wrapper">
+                <el-icon :size="28"><WarningFilled /></el-icon>
+              </div>
+              <div class="warning-info">
+                <h4>{{ warning.course?.name || '未知课程' }}</h4>
+                <p class="warning-desc">综合得分: <strong>{{ warning.composite_score }}</strong> 分</p>
+              </div>
+              <el-tag :type="getRiskTagType(warning.risk_level)" size="default" effect="dark">
+                {{ getRiskLevelText(warning.risk_level) }}
+              </el-tag>
+            </div>
+            <div class="score-details">
+              <div class="score-item">
+                <span class="score-label">出勤</span>
+                <el-progress :percentage="Number(warning.attendance_score || 0)" :stroke-width="6" :show-text="false" />
+                <span class="score-value">{{ warning.attendance_score || 0 }}</span>
+              </div>
+              <div class="score-item">
+                <span class="score-label">视频</span>
+                <el-progress :percentage="Number(warning.progress_score || 0)" :stroke-width="6" :show-text="false" />
+                <span class="score-value">{{ warning.progress_score || 0 }}</span>
+              </div>
+              <div class="score-item">
+                <span class="score-label">作业</span>
+                <el-progress :percentage="Number(warning.homework_score || 0)" :stroke-width="6" :show-text="false" />
+                <span class="score-value">{{ warning.homework_score || 0 }}</span>
+              </div>
+              <div class="score-item">
+                <span class="score-label">考试</span>
+                <el-progress :percentage="Number(warning.exam_score || 0)" :stroke-width="6" :show-text="false" />
+                <span class="score-value">{{ warning.exam_score || 0 }}</span>
+              </div>
+            </div>
+            <el-divider v-if="warning.suggestion" />
+            <div class="suggestion-section" v-if="warning.suggestion">
+              <p class="suggestion-text"><el-icon><MagicStick /></el-icon> {{ warning.suggestion }}</p>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
+    <div v-else class="no-warnings">
+      <el-empty description="暂无预警数据" />
+    </div>
 
     <!-- 学习概览统计 -->
     <el-row :gutter="20" class="overview-row">
@@ -169,9 +200,9 @@
                 <el-icon><TrendCharts /></el-icon>
                 成绩趋势
               </span>
-              <el-radio-group v-model="chartPeriod" size="small" @change="updateChart">
-                <el-radio-button label="week">近7天</el-radio-button>
-                <el-radio-button label="month">本月</el-radio-button>
+              <el-radio-group v-model="chartPeriod" size="small" @change="updateCharts">
+                <el-radio-button value="week">近7天</el-radio-button>
+                <el-radio-button value="month">本月</el-radio-button>
               </el-radio-group>
             </div>
           </template>
@@ -255,11 +286,10 @@ const loadUserInfo = () => {
         username: user.username
       }
     } catch (e) {
-      console.error('解析用户信息失败:', e)
     }
   }
 }
-const currentWarning = ref(null)
+const warnings = ref([])
 const learningStats = ref({})
 const homeworkStats = ref({})
 const examStats = ref({})
@@ -346,7 +376,7 @@ const loadData = async () => {
     const res = await getStudentAnalysisSummary()
     if (res.code === 200) {
       const data = res.data
-      currentWarning.value = data.warnings?.[0] || null
+      warnings.value = data.warnings || []
       learningStats.value = data.learning || {}
       homeworkStats.value = data.homework || {}
       examStats.value = data.exam || {}
@@ -360,7 +390,6 @@ const loadData = async () => {
 
     updateCharts()
   } catch (error) {
-    console.error('加载数据失败:', error)
   }
 }
 
@@ -440,7 +469,6 @@ const updateCharts = async () => {
       }]
     })
   } catch (error) {
-    console.error('加载图表失败:', error)
   }
 }
 
@@ -490,7 +518,6 @@ const generateAIComment = async () => {
       generateLocalComment()
     }
   } catch (error) {
-    console.error('生成评语失败:', error)
     // API失败时使用本地模拟
     generateLocalComment()
   } finally {
@@ -613,9 +640,20 @@ onUnmounted(() => {
 }
 
 /* 预警卡片 */
-.warning-card {
+.warnings-section {
   margin-bottom: 24px;
-  border-radius: 16px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 16px;
+}
+
+.warning-card {
+  margin-bottom: 16px;
+  border-radius: 12px;
 }
 
 .warning-card.high {
@@ -631,6 +669,46 @@ onUnmounted(() => {
 .warning-card.low {
   background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
   border: 1px solid #6ee7b7;
+}
+
+.warning-card.normal {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border: 1px solid #93c5fd;
+}
+
+.no-warnings {
+  margin-bottom: 24px;
+}
+
+.score-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.score-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.score-label {
+  font-size: 12px;
+  color: #606266;
+  min-width: 30px;
+}
+
+.score-value {
+  font-size: 12px;
+  color: #303133;
+  font-weight: 600;
+  min-width: 30px;
+  text-align: right;
+}
+
+.score-item .el-progress {
+  flex: 1;
 }
 
 .warning-header {

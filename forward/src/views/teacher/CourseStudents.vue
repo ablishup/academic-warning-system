@@ -7,7 +7,10 @@
           <el-icon><ArrowLeft /></el-icon>
           返回
         </el-button>
-        <h1>{{ courseName }} - 学生列表</h1>
+        <div>
+          <h1>{{ courseName }} - 学生列表</h1>
+          <p>查看课程学生学情和预警情况</p>
+        </div>
       </div>
       <div class="header-actions">
         <el-button type="primary" @click="showUploadDialog = true">
@@ -21,49 +24,101 @@
     <el-row :gutter="20" class="stats-row">
       <el-col :span="6">
         <el-card class="stat-card" shadow="hover">
-          <div class="stat-icon blue">
-            <el-icon><User /></el-icon>
+          <div class="stat-icon green">
+            <el-icon :size="28"><CircleCheck /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-value">{{ stats.totalStudents }}</div>
-            <div class="stat-label">学生总数</div>
+            <div class="stat-value">{{ stats.normalStudents }}</div>
+            <div class="stat-label">正常学生</div>
+            <div class="stat-change success">
+              <span>整体良好</span>
+            </div>
           </div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card" shadow="hover">
-          <div class="stat-icon green">
-            <el-icon><CircleCheck /></el-icon>
+          <div class="stat-icon blue">
+            <el-icon :size="28"><InfoFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-value">{{ stats.normalStudents }}</div>
-            <div class="stat-label">正常学生</div>
+            <div class="stat-value">{{ stats.lowStudents }}</div>
+            <div class="stat-label">低危学生</div>
+            <div class="stat-change">
+              <span>需留意</span>
+            </div>
           </div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card" shadow="hover">
           <div class="stat-icon orange">
-            <el-icon><Warning /></el-icon>
+            <el-icon :size="28"><Warning /></el-icon>
           </div>
           <div class="stat-info">
             <div class="stat-value">{{ stats.warningStudents }}</div>
-            <div class="stat-label">预警学生</div>
+            <div class="stat-label">中等预警</div>
+            <div class="stat-change warning">
+              <span>需关注</span>
+            </div>
           </div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card" shadow="hover">
           <div class="stat-icon red">
-            <el-icon><CircleClose /></el-icon>
+            <el-icon :size="28"><CircleClose /></el-icon>
           </div>
           <div class="stat-info">
             <div class="stat-value">{{ stats.criticalStudents }}</div>
             <div class="stat-label">高危学生</div>
+            <div class="stat-change danger">
+              <el-icon><ArrowUp /></el-icon>
+              <span>需立即干预</span>
+            </div>
           </div>
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 图表区域 -->
+    <el-row :gutter="20" class="charts-row">
+      <el-col :span="12">
+        <el-card class="chart-card" shadow="hover">
+          <template #header>
+            <div class="card-header">
+              <span class="card-title">
+                <el-icon><PieChart /></el-icon>
+                预警分布
+              </span>
+            </div>
+          </template>
+          <div ref="pieChartRef" class="chart-container"></div>
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card class="chart-card" shadow="hover">
+          <template #header>
+            <div class="card-header">
+              <span class="card-title">
+                <el-icon><Histogram /></el-icon>
+                班级学生对比
+              </span>
+            </div>
+          </template>
+          <div ref="barChartRef" class="chart-container"></div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 课程整体建议 -->
+    <el-card v-if="courseSuggestion" class="suggestion-card" shadow="hover">
+      <div class="suggestion-header">
+        <el-icon :size="20"><MagicStick /></el-icon>
+        <span>课程教学建议</span>
+      </div>
+      <p class="suggestion-text">{{ courseSuggestion }}</p>
+    </el-card>
 
     <!-- 学生列表 -->
     <el-card class="students-card" shadow="never">
@@ -110,11 +165,9 @@
         :data="filteredStudents"
         v-loading="loading"
         style="width: 100%"
-        :default-sort="{ prop: 'composite_score', order: 'ascending' }"
       >
         <el-table-column prop="student_no" label="学号" width="120" sortable />
         <el-table-column prop="name" label="姓名" width="100" />
-        <el-table-column prop="gender" label="性别" width="80" />
         <el-table-column prop="class_name" label="班级" width="180" />
         <el-table-column prop="composite_score" label="综合得分" width="120" sortable>
           <template #default="{ row }">
@@ -264,14 +317,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import * as echarts from 'echarts'
 import {
   ArrowLeft, User, Warning, CircleCheck, CircleClose,
-  List, Search, Refresh, View, Message, Upload
+  List, Search, Refresh, View, Message, Upload, MagicStick,
+  PieChart, Histogram, ArrowUp, InfoFilled
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCourseStudents } from '@/api/teacher'
+import { getCourseStudents, getCourseStats } from '@/api/teacher'
 
 const route = useRoute()
 const router = useRouter()
@@ -294,8 +349,16 @@ const stats = ref({
   totalStudents: 0,
   normalStudents: 0,
   warningStudents: 0,
+  lowStudents: 0,
   criticalStudents: 0
 })
+const courseSuggestion = ref('')
+
+// 图表引用
+const pieChartRef = ref(null)
+const barChartRef = ref(null)
+let pieChart = null
+let barChart = null
 
 // 过滤后的学生列表
 const filteredStudents = computed(() => {
@@ -310,8 +373,71 @@ const filteredStudents = computed(() => {
     )
   }
 
+  // 按预警程度降序排列（高危 > 中等 > 低危 > 正常）
+  const riskOrder = { high: 3, medium: 2, low: 1, null: 0 }
+  result = [...result].sort((a, b) => {
+    const aRisk = riskOrder[a.warning_level] || 0
+    const bRisk = riskOrder[b.warning_level] || 0
+    return bRisk - aRisk
+  })
+
   return result
 })
+
+// 更新图表
+const updateCharts = () => {
+  // 预警分布饼图
+  if (pieChartRef.value) {
+    if (pieChart) pieChart.dispose()
+    pieChart = echarts.init(pieChartRef.value)
+
+    const normalCount = stats.value.normalStudents || 0
+    const warningCount = stats.value.warningStudents || 0
+    const lowCount = stats.value.lowStudents || 0
+    const criticalCount = stats.value.criticalStudents || 0
+
+    pieChart.setOption({
+      tooltip: { trigger: 'item', formatter: '{b}: {c}人 ({d}%)' },
+      legend: { bottom: '5%', left: 'center' },
+      series: [{
+        type: 'pie',
+        radius: ['40%', '70%'],
+        avoidLabelOverlap: false,
+        itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+        label: { show: false },
+        emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+        data: [
+          { value: criticalCount, name: '高危', itemStyle: { color: '#ef4444' } },
+          { value: warningCount, name: '中等', itemStyle: { color: '#f59e0b' } },
+          { value: lowCount, name: '低危', itemStyle: { color: '#3b82f6' } },
+          { value: normalCount, name: '正常', itemStyle: { color: '#10b981' } }
+        ].filter(d => d.value > 0)
+      }]
+    })
+  }
+
+  // 班级学生对比柱状图
+  if (barChartRef.value && classOptions.value.length > 0) {
+    if (barChart) barChart.dispose()
+    barChart = echarts.init(barChartRef.value)
+
+    const classNames = classOptions.value.map(c => c.name)
+    const studentCounts = classOptions.value.map(c => c.student_count || 0)
+
+    barChart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+      xAxis: { type: 'category', data: classNames, axisLabel: { rotate: 15 } },
+      yAxis: { type: 'value', name: '学生数' },
+      series: [{
+        name: '学生数',
+        type: 'bar',
+        data: studentCounts,
+        itemStyle: { color: '#3b82f6', borderRadius: [4, 4, 0, 0] }
+      }]
+    })
+  }
+}
 
 // 加载数据
 const loadData = async () => {
@@ -322,9 +448,13 @@ const loadData = async () => {
       params.class_id = selectedClass.value
     }
 
-    const res = await getCourseStudents(courseId.value, params)
-    if (res.code === 200) {
-      const data = res.data
+    const [studentsRes, statsRes] = await Promise.all([
+      getCourseStudents(courseId.value, params),
+      getCourseStats(courseId.value)
+    ])
+
+    if (studentsRes.code === 200) {
+      const data = studentsRes.data
       courseName.value = data.course.name
       students.value = data.students || []
       classOptions.value = data.classes || []
@@ -333,17 +463,26 @@ const loadData = async () => {
       const total = students.value.length
       const critical = students.value.filter(s => s.warning_level === 'high').length
       const warning = students.value.filter(s => s.warning_level === 'medium').length
-      const normal = total - critical - warning
+      const low = students.value.filter(s => s.warning_level === 'low').length
+      const normal = total - critical - warning - low
 
       stats.value = {
         totalStudents: total,
         normalStudents: normal,
         warningStudents: warning,
+        lowStudents: low,
         criticalStudents: critical
       }
     }
+
+    if (statsRes.code === 200) {
+      courseSuggestion.value = statsRes.data?.course_suggestion || ''
+    }
+
+    // 更新图表
+    await nextTick()
+    updateCharts()
   } catch (error) {
-    console.error('加载数据失败:', error)
     ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
@@ -372,7 +511,7 @@ const getWarningType = (level) => {
   const types = {
     'high': 'danger',
     'medium': 'warning',
-    'low': 'info',
+    'low': 'primary',
     null: 'success'
   }
   return types[level] || 'success'
@@ -382,7 +521,7 @@ const getWarningType = (level) => {
 const getWarningLabel = (level) => {
   const labels = {
     'high': '高危',
-    'medium': '预警',
+    'medium': '中等',
     'low': '低危',
     null: '正常'
   }
@@ -421,12 +560,16 @@ const confirmUpload = () => {
 
 onMounted(() => {
   loadData()
+  window.addEventListener('resize', () => {
+    pieChart?.resize()
+    barChart?.resize()
+  })
 })
 </script>
 
 <style scoped>
 .course-students-page {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -447,6 +590,12 @@ onMounted(() => {
   font-size: 20px;
   font-weight: 600;
   color: #1f2937;
+  margin: 0 0 4px 0;
+}
+
+.header-left p {
+  color: #6b7280;
+  font-size: 14px;
   margin: 0;
 }
 
@@ -462,14 +611,13 @@ onMounted(() => {
 }
 
 .stat-icon {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 24px;
 }
 
 .stat-icon.blue {
@@ -489,15 +637,39 @@ onMounted(() => {
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
   color: #1f2937;
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 14px;
   color: #6b7280;
   margin-top: 4px;
+}
+
+.stat-change {
+  font-size: 12px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-change.danger { color: #ef4444; }
+.stat-change.warning { color: #f59e0b; }
+.stat-change.success { color: #10b981; }
+
+.charts-row {
+  margin-bottom: 24px;
+}
+
+.chart-card {
+  border-radius: 12px;
+}
+
+.chart-container {
+  height: 300px;
 }
 
 .students-card {
@@ -608,5 +780,28 @@ onMounted(() => {
 .upload-area :deep(.el-upload-dragger) {
   width: 100%;
   padding: 40px 20px;
+}
+
+.suggestion-card {
+  margin-bottom: 20px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  border: 1px solid #7dd3fc;
+}
+
+.suggestion-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #0369a1;
+  margin-bottom: 12px;
+}
+
+.suggestion-text {
+  margin: 0;
+  color: #1e40af;
+  font-size: 14px;
+  line-height: 1.6;
 }
 </style>

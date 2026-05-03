@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from classes.models import Student, Class
+from classes.models import Student, ClassInfo
 from courses.models import Course, CourseEnrollment
 from learning.models import (
     LearningActivity, HomeworkAssignment, HomeworkSubmission,
@@ -96,20 +96,20 @@ class TeacherCourseStudentsView(APIView):
             enrollment_map[enrollment.student_id] = enrollment
 
         # 获取学生信息
-        students_query = Student.objects.filter(id__in=student_ids)
+        students_query = Student.objects.select_related('class_info', 'major').filter(id__in=student_ids)
 
         # 应用班级筛选
         if class_id:
-            students_query = students_query.filter(class_id=class_id)
+            students_query = students_query.filter(class_info_id=class_id)
 
         # 获取班级信息映射
         for student in students_query:
-            if student.class_id:
-                class_ids.add(student.class_id)
+            if student.class_info_id:
+                class_ids.add(student.class_info_id)
 
         classes_map = {}
         if class_ids:
-            for cls in Class.objects.filter(id__in=class_ids):
+            for cls in ClassInfo.objects.filter(id__in=class_ids):
                 classes_map[cls.id] = cls.name
 
         data = []
@@ -168,8 +168,8 @@ class TeacherCourseStudentsView(APIView):
                 'student_no': student.student_no,
                 'name': student.name,
                 'gender': gender_map.get(student.gender, '未知'),
-                'class_id': student.class_id,
-                'class_name': classes_map.get(student.class_id, '未分配'),
+                'class_id': student.class_info_id,
+                'class_name': classes_map.get(student.class_info_id, '未分配'),
                 'enroll_time': enrollment.enroll_time,
                 'learning_stats': {
                     'activity_count': activity_stats['activity_count'],
@@ -255,7 +255,7 @@ class TeacherStudentSummaryView(APIView):
             'student_no': student.student_no,
             'name': student.name,
             'gender': student.gender,
-            'class_id': student.class_id,
+            'class_id': student.class_info_id,
             'major_id': student.major_id,
         }
 
@@ -501,7 +501,7 @@ class TeacherCourseStatsView(APIView):
         enrollment_student_ids = CourseEnrollment.objects.filter(
             course_id=course_id
         ).values_list('student_id', flat=True)
-        students = Student.objects.filter(id__in=enrollment_student_ids)
+        students = Student.objects.select_related('class_info', 'major').filter(id__in=enrollment_student_ids)
 
         for student in students:
             hw_avg = HomeworkSubmission.objects.filter(
@@ -545,6 +545,22 @@ class TeacherCourseStatsView(APIView):
             'created_at': w.created_at,
         } for w in recent_warnings]
 
+        # 生成课程整体建议
+        high_count = warning_distribution.get('high', 0)
+        medium_count = warning_distribution.get('medium', 0)
+        low_count = warning_distribution.get('low', 0)
+        normal_count = warning_distribution.get('normal', 0)
+        warning_total = high_count + medium_count + low_count
+
+        if high_count > 0:
+            course_suggestion = f'本课程有 {high_count} 名高危学生、{medium_count} 名中等风险学生，建议重点关注高危学生的学习情况，及时进行干预辅导。'
+        elif medium_count > 0:
+            course_suggestion = f'本课程有 {medium_count} 名中等风险学生，建议适当关注这些学生的学习进度，必要时提供额外辅导。'
+        elif low_count > 0:
+            course_suggestion = f'本课程整体学情良好，有 {low_count} 名低风险学生，建议保持当前教学节奏。'
+        else:
+            course_suggestion = '本课程学情状态优秀，所有学生均为正常状态，请继续保持。'
+
         return Response({
             'code': 200,
             'message': '获取成功',
@@ -563,5 +579,6 @@ class TeacherCourseStatsView(APIView):
                 'warning_distribution': warning_distribution,
                 'score_distribution': score_ranges,
                 'warning_students': warning_students,
+                'course_suggestion': course_suggestion,
             }
         })

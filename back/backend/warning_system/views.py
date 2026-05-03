@@ -115,18 +115,8 @@ class WarningCalculateView(APIView):
         if course_id:
             scores_query = scores_query.filter(course_id=course_id)
 
-        # 初始化预测器
-        predictor = WarningPredictor()
-        # 尝试加载已有模型，如果没有则使用传统方法
-        use_ml = predictor.load_model()
-        if not use_ml:
-            # 尝试训练模型（使用默认数据）
-            try:
-                predictor.train()
-                use_ml = True
-            except Exception as e:
-                # 训练失败则使用传统加权方法
-                use_ml = False
+        # 使用加权方法计算（不依赖ML模型）
+        use_ml = False
 
         # 计算预警
         created_count = 0
@@ -176,21 +166,19 @@ class WarningCalculateView(APIView):
                 updated_count += 1
                 result = 'updated'
             else:
-                # 创建新预警（只对非normal等级）
-                result = 'no_change'
-                if risk_level != 'normal':
-                    WarningRecord.objects.create(
-                        student=score.student,
-                        course=score.course,
-                        risk_level=risk_level,
-                        composite_score=composite_score,
-                        attendance_score=score.attendance_rate,
-                        progress_score=score.video_progress,
-                        homework_score=score.homework_avg,
-                        exam_score=score.exam_avg,
-                    )
-                    created_count += 1
-                    result = 'created'
+                # 创建新预警（所有风险等级）
+                WarningRecord.objects.create(
+                    student=score.student,
+                    course=score.course,
+                    risk_level=risk_level,
+                    composite_score=composite_score,
+                    attendance_score=score.attendance_rate,
+                    progress_score=score.video_progress,
+                    homework_score=score.homework_avg,
+                    exam_score=score.exam_avg,
+                )
+                created_count += 1
+                result = 'created'
 
             calculation_results.append({
                 'student_id': score.student_id,
@@ -460,12 +448,12 @@ class StudentWarningSummaryView(APIView):
 
         # 获取学生范围：管理员看所有，辅导员看管理的班级
         if is_admin:
-            all_students = Student.objects.all()
+            all_students = Student.objects.select_related('class_info', 'major').all()
         else:
             # 获取辅导员管理的所有学生
-            from classes.models import Class
+            from classes.models import ClassInfo
 
-            managed_classes = Class.objects.filter(counselor_id=user.id)
+            managed_classes = ClassInfo.objects.filter(counselor_id=user.id)
             class_ids = [c.id for c in managed_classes]
 
             if not class_ids:
@@ -479,7 +467,7 @@ class StudentWarningSummaryView(APIView):
                     }
                 })
 
-            all_students = Student.objects.filter(class_id__in=class_ids)
+            all_students = Student.objects.select_related('class_info', 'major').filter(class_info_id__in=class_ids)
 
         # 获取这些学生的所有预警记录
         student_ids = [s.id for s in all_students]

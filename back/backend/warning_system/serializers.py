@@ -10,14 +10,40 @@ class WarningRecordListSerializer(serializers.ModelSerializer):
     course = CourseSerializer(read_only=True)
     risk_level_display = serializers.CharField(source='get_risk_level_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    suggestion = serializers.SerializerMethodField()
 
     class Meta:
         model = WarningRecord
         fields = [
             'id', 'student', 'course', 'risk_level', 'risk_level_display',
-            'composite_score', 'status', 'status_display',
+            'composite_score', 'attendance_score', 'progress_score',
+            'homework_score', 'exam_score',
+            'suggestion', 'status', 'status_display',
             'calculation_time', 'created_at'
         ]
+
+    def get_suggestion(self, obj):
+        """根据风险等级和各维度分数生成知识点建议"""
+        if obj.risk_level == 'normal':
+            return '当前学习状态良好，请继续保持。'
+
+        # 找出最薄弱的维度
+        scores = {
+            '出勤': float(obj.attendance_score or 0),
+            '视频学习进度': float(obj.progress_score or 0),
+            '作业成绩': float(obj.homework_score or 0),
+            '考试成绩': float(obj.exam_score or 0),
+        }
+        sorted_scores = sorted(scores.items(), key=lambda x: x[1])
+        weakest = sorted_scores[0]
+        second_weakest = sorted_scores[1]
+
+        if obj.risk_level == 'high':
+            return f'学习状态严重预警，建议立即强化以下薄弱环节：{weakest[0]}（{weakest[1]:.0f}分）、{second_weakest[0]}（{second_weakest[1]:.0f}分）。请及时联系辅导员寻求帮助。'
+        elif obj.risk_level == 'medium':
+            return f'学习状态存在风险，建议重点关注：{weakest[0]}（{weakest[1]:.0f}分）、{second_weakest[0]}（{second_weakest[1]:.0f}分）。请合理安排时间加强学习。'
+        else:  # low
+            return f'学习状态基本正常，建议适当关注：{weakest[0]}（{weakest[1]:.0f}分）。继续保持当前学习节奏。'
 
 
 class WarningRecordDetailSerializer(serializers.ModelSerializer):

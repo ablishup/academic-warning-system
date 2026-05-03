@@ -51,6 +51,7 @@ dist/
 .env.local
 .env.*.local
 venv/
+venv_test/
 ENV/
 env/
 
@@ -66,6 +67,9 @@ data/基于在线教学平台的数据挖掘与学习行为分析【超星集团
 !data/schema/
 !data/scripts/
 !data/*.md
+
+# Database backups
+backup_*.sql
 
 # Misc
 *.pid
